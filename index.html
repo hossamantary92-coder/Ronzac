@@ -314,6 +314,12 @@
                     </div>
                 </div>
 
+                <!-- Live Image Preview inside Modal -->
+                <div id="modal-img-preview-box" class="hidden pt-2 text-center">
+                    <span class="block text-[11px] font-bold text-emerald-700 mb-1">الصورة المحفوظة حالياً لهذا الصنف:</span>
+                    <img id="modal-img-preview" src="" alt="Preview" class="h-24 w-auto mx-auto object-contain rounded-lg border border-slate-200 p-1 bg-white">
+                </div>
+
                 <div class="flex flex-wrap gap-2 pt-3">
                     <button type="submit" id="save-prod-submit-btn" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl text-sm cursor-pointer shadow">
                         💾 حفظ بيانات الصنف
@@ -1050,11 +1056,15 @@
         let selectedStockFilter = "ALL";
         let allFlipped = false;
 
+        // Recover data from ALL previous versions (v2, v3, embedded, localStorage)
         function loadInitialDataSync() {
             try {
-                const savedProds = localStorage.getItem('ronzac_products_db_v3');
-                if (savedProds) {
-                    productsList = JSON.parse(savedProds);
+                const v3 = localStorage.getItem('ronzac_products_db_v3');
+                const v2 = localStorage.getItem('ronzac_products_db_v2');
+                if (v3) {
+                    productsList = JSON.parse(v3);
+                } else if (v2) {
+                    productsList = JSON.parse(v2);
                 } else if (window.__EMBEDDED_PRODUCTS__ && Array.isArray(window.__EMBEDDED_PRODUCTS__)) {
                     productsList = JSON.parse(JSON.stringify(window.__EMBEDDED_PRODUCTS__));
                 } else {
@@ -1073,48 +1083,81 @@
                 Object.assign(customImages, legacyImgs);
             } catch (e) {}
 
+            // Also recover any image stored directly inside product objects
+            productsList.forEach(p => {
+                if (p.customImage && !customImages[p.code]) {
+                    customImages[p.code] = p.customImage;
+                }
+            });
+
             sortProducts();
         }
 
-        function syncIndexedDBInBackground() {
-            if (!window.indexedDB) return;
-            try {
-                const req = indexedDB.open('RonzacFlashcardsDB', 1);
-                req.onupgradeneeded = (e) => {
-                    const db = e.target.result;
-                    if (!db.objectStoreNames.contains('customImagesStore')) {
-                        db.createObjectStore('customImagesStore');
-                    }
-                };
-                req.onsuccess = (e) => {
-                    const db = e.target.result;
-                    try {
-                        const tx = db.transaction('customImagesStore', 'readonly');
-                        const store = tx.objectStore('customImagesStore');
-                        const cursorReq = store.openCursor();
-                        let updated = false;
-                        cursorReq.onsuccess = (ev) => {
-                            const cursor = ev.target.result;
-                            if (cursor) {
-                                if (!customImages[cursor.key]) {
-                                    customImages[cursor.key] = cursor.value;
-                                    updated = true;
+        // Pull all saved images from IndexedDB and inject them directly into rendered cards
+        function fetchAllImagesFromIndexedDB() {
+            return new Promise((resolve) => {
+                if (!window.indexedDB) return resolve(false);
+                try {
+                    const req = indexedDB.open('RonzacFlashcardsDB', 1);
+                    req.onupgradeneeded = (e) => {
+                        const db = e.target.result;
+                        if (!db.objectStoreNames.contains('customImagesStore')) {
+                            db.createObjectStore('customImagesStore');
+                        }
+                    };
+                    req.onsuccess = (e) => {
+                        const db = e.target.result;
+                        try {
+                            const tx = db.transaction('customImagesStore', 'readonly');
+                            const store = tx.objectStore('customImagesStore');
+                            const cursorReq = store.openCursor();
+                            let foundNew = false;
+                            cursorReq.onsuccess = (ev) => {
+                                const cursor = ev.target.result;
+                                if (cursor) {
+                                    const code = String(cursor.key);
+                                    const imgVal = cursor.value;
+                                    if (imgVal) {
+                                        customImages[code] = imgVal;
+                                        const prod = productsList.find(p => p.code === code);
+                                        if (prod) prod.customImage = imgVal;
+                                        foundNew = true;
+
+                                        // Live DOM injection so image appears immediately
+                                        const slot = document.querySelector(`.img-slot[data-code="${code}"]`);
+                                        if (slot) {
+                                            slot.innerHTML = `<img src="${imgVal}" alt="${code}" class="custom-prod-img max-h-36 w-auto object-contain mx-auto">`;
+                                        }
+                                    }
+                                    cursor.continue();
+                                } else {
+                                    if (foundNew) {
+                                        try { localStorage.setItem('ronzac_custom_images', JSON.stringify(customImages)); } catch(err){}
+                                    }
+                                    resolve(foundNew);
                                 }
-                                cursor.continue();
-                            } else if (updated) {
-                                renderFlashcards();
-                            }
-                        };
-                    } catch (err) {}
-                };
-            } catch (e) {}
+                            };
+                            cursorReq.onerror = () => resolve(false);
+                        } catch (err) {
+                            resolve(false);
+                        }
+                    };
+                    req.onerror = () => resolve(false);
+                } catch (e) {
+                    resolve(false);
+                }
+            });
         }
 
         function saveImagePermanently(code, dataUrl) {
             customImages[code] = dataUrl;
+            const prod = productsList.find(p => p.code === code);
+            if (prod) prod.customImage = dataUrl;
+
             try {
                 localStorage.setItem('ronzac_custom_images', JSON.stringify(customImages));
             } catch (e) {}
+
             if (window.indexedDB) {
                 try {
                     const req = indexedDB.open('RonzacFlashcardsDB', 1);
@@ -1129,9 +1172,13 @@
 
         function removeImagePermanently(code) {
             delete customImages[code];
+            const prod = productsList.find(p => p.code === code);
+            if (prod) delete prod.customImage;
+
             try {
                 localStorage.setItem('ronzac_custom_images', JSON.stringify(customImages));
             } catch (e) {}
+
             if (window.indexedDB) {
                 try {
                     const req = indexedDB.open('RonzacFlashcardsDB', 1);
@@ -1144,7 +1191,7 @@
             }
         }
 
-        function compressImageFile(file, maxSize = 320, quality = 0.78) {
+        function compressImageFile(file, maxSize = 300, quality = 0.76) {
             return new Promise((resolve, reject) => {
                 const reader = new FileReader();
                 reader.onload = (evt) => {
@@ -1200,7 +1247,8 @@
             }, 3000);
         }
 
-        function exportPortableHTML() {
+        async function exportPortableHTML() {
+            await fetchAllImagesFromIndexedDB();
             const stateScript = document.getElementById('embedded-custom-state');
             stateScript.textContent = `\nwindow.__EMBEDDED_PRODUCTS__ = ${JSON.stringify(productsList)};\nwindow.__EMBEDDED_IMAGES__ = ${JSON.stringify(customImages)};\n`;
             const fullHtml = "<!DOCTYPE html>\n" + document.documentElement.outerHTML;
@@ -1213,7 +1261,7 @@
             a.click();
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
-            showToast('تم تحميل نسخة index.html المحدثة بنجاح!');
+            showToast('تم تحميل نسخة index.html شاملة جميع الصور!');
         }
 
         // DOM Elements
@@ -1230,11 +1278,13 @@
         const flipAllBtn = document.getElementById('flip-all-btn');
         const flipAllText = document.getElementById('flip-all-text');
 
-        function initApp() {
+        async function initApp() {
             loadInitialDataSync();
             updateStatsAndCategories();
             renderFlashcards();
-            syncIndexedDBInBackground();
+
+            // Fetch all IndexedDB images and update live DOM slots immediately
+            await fetchAllImagesFromIndexedDB();
 
             searchInput.addEventListener('input', (e) => {
                 currentSearchQuery = e.target.value.trim().toLowerCase();
@@ -1271,7 +1321,6 @@
                 flipAllText.innerText = allFlipped ? 'إرجاع للواجهة' : 'قلب الكل';
             });
 
-            // Hidden admin shortcut: Double-click top capsule icon to export index.html
             document.getElementById('secret-export-trigger').addEventListener('dblclick', exportPortableHTML);
 
             document.getElementById('add-product-btn').addEventListener('click', () => openProductModal(null));
@@ -1283,6 +1332,7 @@
                 const code = document.getElementById('edit-original-code').value;
                 if (code) {
                     removeImagePermanently(code);
+                    saveProductsToStorage();
                     showToast('تمت استعادة شكل العبوة الافتراضي');
                     renderFlashcards();
                     closeProductModal();
@@ -1376,7 +1426,7 @@
                 const isDiamond = item.listClass.toUpperCase() === 'DIAMOND';
                 const isAvail = item.available !== false;
                 const theme = categoryThemes[item.cat] || { grad: "from-emerald-600 to-teal-700", light: "bg-emerald-50 text-emerald-800 border-emerald-200", hex1: "#0f766e", hex2: "#14b8a6", icon: "fa-capsules" };
-                const hasCustomImg = Boolean(customImages[item.code]);
+                const savedImg = customImages[item.code] || item.customImage;
                 const dawaaUrl = item.dawaaSlug 
                     ? `https://www.al-dawaa.com/ar/p/${item.code}/${item.dawaaSlug}`
                     : `https://www.al-dawaa.com/ar/catalogsearch/result/?q=${item.code}`;
@@ -1394,8 +1444,8 @@
                     </button>`;
 
                 const defaultPackageHTML = buildPureHTMLPackage(item, theme);
-                const visualStageHTML = hasCustomImg
-                    ? `<img src="${customImages[item.code]}" alt="${item.nameAr}" class="custom-prod-img max-h-36 w-auto object-contain mx-auto">`
+                const visualStageHTML = savedImg
+                    ? `<img src="${savedImg}" alt="${item.nameAr}" class="custom-prod-img max-h-36 w-auto object-contain mx-auto">`
                     : defaultPackageHTML;
 
                 const card = document.createElement('div');
@@ -1427,7 +1477,7 @@
 
                         <!-- Visual Product Stage -->
                         <div class="visual-stage relative flex-grow flex items-center justify-center px-4 py-1 overflow-hidden">
-                            <div class="img-slot w-full flex items-center justify-center">
+                            <div class="img-slot w-full flex items-center justify-center" data-code="${item.code}">
                                 ${visualStageHTML}
                             </div>
                             ${!isAvail ? `<span class="absolute bg-rose-600/95 text-white text-xs font-black px-3 py-1 rounded-full shadow-md z-30 -rotate-12">غير متوفر حالياً</span>` : ''}
@@ -1549,10 +1599,13 @@
             const imgUrlInput = document.getElementById('prod-img-url');
             const imgFileInput = document.getElementById('prod-img-file');
             const removeImgBtn = document.getElementById('remove-custom-img-btn');
+            const previewBox = document.getElementById('modal-img-preview-box');
+            const previewImg = document.getElementById('modal-img-preview');
 
             imgFileInput.value = '';
 
             if (item) {
+                const existingImg = customImages[item.code] || item.customImage;
                 modalTitle.innerHTML = `<i class="fa-solid fa-pen-to-square text-sky-600"></i><span>تعديل الصنف أو الصورة (${item.code})</span>`;
                 origCodeInput.value = item.code;
                 codeInput.value = item.code;
@@ -1565,13 +1618,21 @@
                 compInput.value = item.composition;
                 infoInput.value = item.info;
                 counsInput.value = item.counseling;
-                imgUrlInput.value = (customImages[item.code] && !customImages[item.code].startsWith('data:')) ? customImages[item.code] : '';
-                removeImgBtn.classList.toggle('hidden', !customImages[item.code]);
+                imgUrlInput.value = (existingImg && !existingImg.startsWith('data:')) ? existingImg : '';
+                removeImgBtn.classList.toggle('hidden', !existingImg);
+
+                if (existingImg) {
+                    previewImg.src = existingImg;
+                    previewBox.classList.remove('hidden');
+                } else {
+                    previewBox.classList.add('hidden');
+                }
             } else {
                 modalTitle.innerHTML = `<i class="fa-solid fa-plus-circle text-emerald-600"></i><span>إضافة صنف جديد للقائمة</span>`;
                 origCodeInput.value = '';
                 document.getElementById('product-form').reset();
                 removeImgBtn.classList.add('hidden');
+                previewBox.classList.add('hidden');
                 if (selectedCategory !== "الكل") {
                     catInput.value = selectedCategory;
                 }
@@ -1606,10 +1667,18 @@
                 const urlInput = document.getElementById('prod-img-url').value.trim();
                 const fileInput = document.getElementById('prod-img-file').files[0];
 
+                let finalImgData = customImages[code] || (origCode ? customImages[origCode] : undefined);
+                if (fileInput) {
+                    finalImgData = await compressImageFile(fileInput, 300, 0.76);
+                } else if (urlInput) {
+                    finalImgData = urlInput;
+                }
+
                 const newProductObj = {
                     code, nameEn, nameAr, cat, listClass, form, available,
                     composition, info, counseling,
-                    dawaaSlug: origCode ? (productsList.find(p => p.code === origCode)?.dawaaSlug || "") : ""
+                    dawaaSlug: origCode ? (productsList.find(p => p.code === origCode)?.dawaaSlug || "") : "",
+                    customImage: finalImgData
                 };
 
                 if (origCode) {
@@ -1631,18 +1700,15 @@
                     }
                 }
 
-                if (fileInput) {
-                    const compressedDataUrl = await compressImageFile(fileInput, 320, 0.78);
-                    saveImagePermanently(code, compressedDataUrl);
-                } else if (urlInput) {
-                    saveImagePermanently(code, urlInput);
+                if (finalImgData) {
+                    saveImagePermanently(code, finalImgData);
                 }
 
                 saveProductsToStorage();
                 updateStatsAndCategories();
                 renderFlashcards();
                 closeProductModal();
-                showToast('تم حفظ بيانات الصنف بنجاح!');
+                showToast('تم حفظ الصنف والصورة بنجاح!');
             } catch (err) {
                 alert('حدث خطأ أثناء حفظ الصورة، حاول مرة أخرى.');
             } finally {
