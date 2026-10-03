@@ -1,0 +1,1185 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ronzac Interactive Flashcards | د. حسام</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts Cairo -->
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Cairo', system-ui, -apple-system, sans-serif;
+            background-color: #f1f5f9;
+            color: #1e293b;
+            margin: 0;
+            padding: 0;
+        }
+        
+        /* 3D Flip Card Styles */
+        .perspective-1000 {
+            perspective: 1000px;
+        }
+        .flip-card {
+            height: 430px;
+            cursor: pointer;
+            user-select: none;
+        }
+        .flip-card-inner {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            transition: transform 0.6s cubic-bezier(0.4, 0.2, 0.2, 1);
+            transform-style: preserve-3d;
+        }
+        .flip-card.flipped .flip-card-inner {
+            transform: rotateY(180deg);
+        }
+        .flip-card-front, .flip-card-back {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            -webkit-backface-visibility: hidden;
+            backface-visibility: hidden;
+            border-radius: 1rem;
+            background: #ffffff;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            overflow: hidden;
+        }
+        .flip-card-back {
+            transform: rotateY(180deg);
+        }
+
+        /* Fallback Grid if Tailwind is blocked offline */
+        #cards-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 1.5rem;
+        }
+
+        /* Custom Scrollbar for Card Back */
+        .custom-scroll::-webkit-scrollbar {
+            width: 5px;
+        }
+        .custom-scroll::-webkit-scrollbar-track {
+            background: #f1f5f9;
+            border-radius: 8px;
+        }
+        .custom-scroll::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col">
+
+    <!-- Header Section -->
+    <header class="bg-gradient-to-r from-slate-900 via-emerald-900 to-slate-900 text-white shadow-xl border-b border-emerald-500/20 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <div class="flex flex-col md:flex-row justify-between items-center gap-4">
+                <div class="flex items-center space-x-3 space-x-reverse">
+                    <div class="bg-emerald-500 text-slate-900 p-2.5 rounded-xl shadow-lg">
+                        <i class="fa-solid fa-layer-group text-2xl"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-2xl md:text-3xl font-black tracking-wide text-white flex items-center gap-2">
+                            <span>Ronzac Flashcards</span>
+                            <span class="text-xs bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2.5 py-0.5 rounded-full font-bold">دليل الصيدلي التفاعلي</span>
+                        </h1>
+                        <p class="text-xs text-slate-300 mt-0.5">اضغط على أي بطاقة لعرض التركيبة العلمية، الفوائد، ونصائح الصرف (Counseling Tips)</p>
+                    </div>
+                </div>
+
+                <!-- Stats & Quick Actions -->
+                <div class="flex flex-wrap items-center gap-3">
+                    <div class="flex items-center space-x-3 space-x-reverse bg-slate-800/90 p-1.5 rounded-xl border border-slate-700">
+                        <div class="text-center px-3 py-1">
+                            <span class="block text-[11px] text-slate-400 font-semibold">إجمالي الأصناف</span>
+                            <span id="total-count" class="text-lg font-bold text-emerald-400">0</span>
+                        </div>
+                        <div class="h-8 w-px bg-slate-700"></div>
+                        <div class="text-center px-3 py-1">
+                            <span class="block text-[11px] text-slate-400 font-semibold">Diamond</span>
+                            <span id="diamond-count" class="text-lg font-bold text-sky-400">0</span>
+                        </div>
+                        <div class="h-8 w-px bg-slate-700"></div>
+                        <div class="text-center px-3 py-1">
+                            <span class="block text-[11px] text-slate-400 font-semibold">Gold</span>
+                            <span id="gold-count" class="text-lg font-bold text-amber-400">0</span>
+                        </div>
+                    </div>
+
+                    <button id="flip-all-btn" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 px-4 rounded-xl text-xs transition-all shadow-lg flex items-center gap-2 cursor-pointer">
+                        <i class="fa-solid fa-rotate"></i>
+                        <span id="flip-all-text">قلب كل البطاقات</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Container -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-grow w-full">
+
+        <!-- Controls Section -->
+        <section class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 mb-8">
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 mb-5">
+                <!-- Search Bar -->
+                <div class="lg:col-span-6 relative">
+                    <input type="text" id="search-input" 
+                        placeholder="ابحث بالكود (SKU)، اسم المنتج، أو المادة الفعالة (مثال: ميلاتونين، زنك، كولاجين)..." 
+                        class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition-all font-semibold">
+                </div>
+
+                <!-- Class Filter -->
+                <div class="lg:col-span-3">
+                    <select id="class-filter" class="w-full py-3 px-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 font-bold text-slate-700">
+                        <option value="ALL">🔥 كل الفئات (Power Up)</option>
+                        <option value="Diamond">💎 فئة Diamond</option>
+                        <option value="GOLD">⭐ فئة Gold</option>
+                    </select>
+                </div>
+
+                <!-- Reset Button -->
+                <div class="lg:col-span-3">
+                    <button id="reset-btn" class="w-full bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold py-3 px-3 rounded-xl text-sm transition-all border border-rose-200 flex items-center justify-center gap-2 cursor-pointer">
+                        <i class="fa-solid fa-rotate-right"></i>
+                        <span>إعادة ضبط الفلاتر</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Medical Categories Tabs -->
+            <div>
+                <label class="block text-xs font-bold text-slate-500 mb-2.5">التصنيف العلاجي / الطبّي:</label>
+                <div id="category-chips" class="flex flex-wrap gap-2"></div>
+            </div>
+        </section>
+
+        <!-- Active Filter Bar -->
+        <div id="filter-status-bar" class="hidden mb-6 flex items-center justify-between bg-emerald-50 border border-emerald-200 p-3.5 rounded-xl text-sm text-emerald-800">
+            <div>
+                <span>تصفية نشطة: <strong id="active-filter-text">--</strong></span>
+            </div>
+            <span id="results-count" class="bg-emerald-600 text-white px-3 py-1 rounded-full font-bold text-xs">0 بطاقة</span>
+        </div>
+
+        <!-- Flashcards Grid Container -->
+        <div id="cards-grid"></div>
+
+        <!-- Empty State -->
+        <div id="empty-state" class="hidden bg-white rounded-2xl shadow-sm border border-slate-200 py-16 text-center">
+            <h3 class="text-lg font-bold text-slate-700">لا توجد بطاقات مطابقة للبحث!</h3>
+            <p class="text-slate-500 text-sm mt-1">تأكد من كتابة الكود أو الاسم أو المادة الفعالة بشكل صحيح، أو اضغط إعادة ضبط الفلاتر.</p>
+        </div>
+
+    </main>
+
+    <!-- Image Upload Modal -->
+    <div id="img-modal" class="fixed inset-0 bg-slate-900/60 z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200">
+            <div class="flex justify-between items-center mb-4 pb-3 border-b border-slate-100">
+                <h3 class="font-bold text-lg text-slate-800">تحديث صورة الصنف</h3>
+                <button id="close-modal-btn" class="text-slate-400 hover:text-slate-600 cursor-pointer">✕</button>
+            </div>
+            <p id="modal-product-name" class="text-sm font-bold text-emerald-700 mb-4"></p>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-600 mb-1">رابط صورة مباشر (URL):</label>
+                    <input type="url" id="custom-img-url" placeholder="https://..." class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm" dir="ltr">
+                </div>
+                <div class="text-center text-xs text-slate-400 font-bold">— أو —</div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-600 mb-1">رفع صورة من جهازك:</label>
+                    <input type="file" id="custom-img-file" accept="image/*" class="w-full text-xs text-slate-500">
+                </div>
+            </div>
+            <div class="flex gap-2 mt-6">
+                <button id="save-img-btn" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl text-sm cursor-pointer">حفظ الصورة</button>
+                <button id="reset-img-btn" class="bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold py-2.5 px-4 rounded-xl text-sm cursor-pointer">استعادة الافتراضي</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t border-slate-200 py-6 mt-12 text-center text-xs text-slate-500">
+        <div class="max-w-7xl mx-auto px-4">
+            <p class="font-bold text-slate-700">Ronzac Interactive Flashcards — دكتور حسام</p>
+        </div>
+    </footer>
+
+    <!-- JavaScript Data & Logic -->
+    <script>
+        const rawProductsData = [
+            {
+                code: "508148", nameEn: "ARTHOR 60 CAP", nameAr: "أرثر 60 كبسولة", cat: "عظام ومفاصل", listClass: "Diamond", form: "capsules",
+                composition: "إم إس إم (MSM) 400 مجم + حمض الهيالورونيك (Hyaluronic Acid) 25 مجم + خلاصة الكركم (Turmeric) 2 مجم + جلوكوزامين داعم للغضاريف.",
+                info: "تركيبة متكاملة مضادة للالتهاب تساعد في بناء الغضاريف والسائل الزلالي حول المفاصل، وتقليل التيبس والألم أثناء الحركة في حالات خشونة المفاصل.",
+                counseling: "كبسولة مرتين يومياً بعد الأكل. يُنصح بالاستمرار عليه لمدة 4-8 أسابيع لأفضل نتيجة، مع تخفيف الوزن وشرب كميات كافية من الماء.",
+                dawaaSlug: "arthor-reduce-joint-pain-60-capsules"
+            },
+            {
+                code: "507396", nameEn: "BETIKA WOUND HEALING OINTMENT 30 GM", nameAr: "بيتيكا للحروق والجروح مرهم 30 جم", cat: "جلدية وجروح", listClass: "Diamond", form: "ointment",
+                composition: "زيت الزيتون (2%) + زيت السمسم (1%) + خلاصة أزهار الأقحوان / الكالينديولا (1%) + آلانتوين (Allantoin 1%).",
+                info: "مرهم عشبي طبيعي 100% يعمل على عزل الجروح والحروق السطحية، ترطيب الجلد بعمق، تهدئة الالتهابات، وتحفيز تجديد خلايا البشرة بدون ندبات.",
+                counseling: "توضع طبقة رقيقة على المنطقة المصابة من 2 إلى 3 مرات يومياً بعد تنظيفها. ممتاز للحروق السطحية، جروح ما بعد العمليات، وتشققات الجلد.",
+                dawaaSlug: "betika-ointment-moisturiser-improve-skin-appearance-30-gm"
+            },
+            {
+                code: "507397", nameEn: "BETIKA WOUND HEALING OINTMENT 90 GM", nameAr: "بيتيكا للحروق والجروح مرهم 90 جم", cat: "جلدية وجروح", listClass: "Diamond", form: "ointment",
+                composition: "زيت الزيتون (2%) + زيت السمسم (1%) + خلاصة أزهار الأقحوان (1%) + آلانتوين (Allantoin 1%) — الحجم العائلي الكبير.",
+                info: "يوفر بيئة رطبة مثالية لالتئام الحروق والجروح المزمنة وقرح الفراش والقدم السكري، مع مضادات أكسدة طبيعية تحمي الأنسجة المتجددة.",
+                counseling: "يُدهن من 2-3 مرات يومياً. الحجم 90 جم اقتصادي ومناسب جداً للحالات التي تحتاج غيارات مستمرة أو مساحات واسعة من الجلد.",
+                dawaaSlug: "betika-ointment-moisturiser-improve-skin-appearance-30-gm"
+            },
+            {
+                code: "507983", nameEn: "BREATHIONA 100 ML SYRUP", nameAr: "بريثيونا 100 مل شراب", cat: "جهاز تنفسي وسعال", listClass: "Diamond", form: "syrup",
+                composition: "مستخلص جذور البلارجونيوم (Pelargonium) 500 مجم + مستخلص اليانسون الجاف 800 مجم + مستخلص الزعتر الجاف (Thyme) 700 مجم.",
+                info: "شراب عشبي ألماني ثلاثي المفعول: مذيب وطارد للبلغم، موسع للشعب الهوائية ومهدئ لتقلصات القصبات، ويرفع مناعة الجهاز التنفسي ضد الفيروسات.",
+                counseling: "5 مل مرتين يومياً (أو 3 مرات حسب شدة الكحة). يرج جيداً قبل الاستخدام، ولا يسبب النعاس نهائياً.",
+                dawaaSlug: "breathiona-syrup-relieves-cough-100-ml"
+            },
+            {
+                code: "508625", nameEn: "CAPILLORIN PLUS 60 CAPSULE", nameAr: "كابيلورين بلس 60 كبسولة", cat: "شعر وأظافر", listClass: "Diamond", form: "capsules",
+                composition: "أحماض أمينية كبريتية (L-Cystine & L-Methionine) + بيوتين + زنك + حديد + مجموعة فيتامينات B المركبة ومستخلصات عشبية مغذية لبصيلات الشعر.",
+                info: "تركيبة مكثفة لإيقاف تساقط الشعر التفاعلي والوراثي، تحفيز تكوين الكيراتين الطبيعي، وزيادة كثافة الشعر وقوة الأظافر المتقصفة.",
+                counseling: "كبسولة مرتين يومياً بعد الوجبات. يُنصح بكورس لا يقل عن 3 أشهر لملاحظة دورة نمو شعر جديدة كاملة.",
+                dawaaSlug: ""
+            },
+            {
+                code: "508053", nameEn: "CARNITOVA 20 DRINKABLE VIALS", nameAr: "كارنيتوفا 20 فيال شراب", cat: "نشاط وطاقة", listClass: "Diamond", form: "vials",
+                composition: "إل-كارنيتين سائل عالي التركيز (L-Carnitine) + غذاء ملكات النحل + فيتامينات داعمة للأيض وإنتاج الطاقة الخلوية.",
+                info: "امبولات شرب سريعة الامتصاص تنقل الأحماض الدهنية إلى الميتوكوندريا لتحويل الدهون إلى طاقة عضلية وذهنية، وتقلل الإجهاد العضلي.",
+                counseling: "فيال واحد يومياً صباحاً أو قبل التمرين بـ 30 دقيقة. يمكن شربه مباشرة أو تخفيفه بنصف كوب ماء أو عصير.",
+                dawaaSlug: "carnitova-food-supplement-drinkable-20-vials"
+            },
+            {
+                code: "508135", nameEn: "C-RONZ VIT C 1000 MG 20 EFF TABLET", nameAr: "سي رونز فيتامين سي 1000 مجم 20 قرص فوار", cat: "فيتامينات ومناعة", listClass: "Diamond", form: "effervescent",
+                composition: "فيتامين سي (Ascorbic Acid) بتركيز 1000 مجم لكل قرص فوار بطعم البرتقال المنعش.",
+                info: "مضاد أكسدة قوي يدعم الجهاز المناعي، يسرع التعافي من نزلات البرد، يحفز تصنيع الكولاجين في البشرة والأوعية الدموية، ويزيد امتصاص الحديد.",
+                counseling: "قرص فوار واحد يومياً يذاب في كوب ماء (200 مل) صباحاً أو بعد الغداء. يفضل تجنب تناوله ليلاً لمرضى حصوات الكلى.",
+                dawaaSlug: "c-ronz-vitamin-c-1000-mg-effervescent-20-tablets"
+            },
+            {
+                code: "508514", nameEn: "C-RONZ 1000 MG PLUS ZINC 20 EFF TAB", nameAr: "سي رونز 1000 مجم بلس زنك 20 قرص فوار", cat: "فيتامينات ومناعة", listClass: "Diamond", form: "effervescent",
+                composition: "فيتامين سي (Vitamin C) 1000 مجم + زنك (Zinc) بتركيز مدعم للمناعة في أقراص فوارة سريعة الذوبان.",
+                info: "ثنائي المناعة الذهبي؛ يجمع بين فيتامين سي والزنك لتقليل مدة وشدة أدوار البرد والإنفلونزا، وحماية الخلايا من الإجهاد التأكسدي.",
+                counseling: "قرص واحد يومياً مذاب في كوب ماء بعد الوجبة (وجود الطعام يقلل أي غثيان خفيف قد يسببه الزنك على معدة فارغة).",
+                dawaaSlug: "c-ronz-1000-vitamin-c-plus-zinc-effervescent-20-tablets"
+            },
+            {
+                code: "508559", nameEn: "C-RONZ 2000 MG 20 EFF TAB", nameAr: "سي رونز 2000 مجم 20 قرص فوار", cat: "فيتامينات ومناعة", listClass: "Diamond", form: "effervescent",
+                composition: "فيتامين سي فائق التركيز (Vitamin C 2000 mg) لكل قرص فوار.",
+                info: "تركيز مضاعف لحالات الإجهاد الشديد، المدخنين، وبداية أدوار العدوى الفيروسية الحادة لتعويض استنزاف فيتامين سي السريع في الجسم.",
+                counseling: "قرص فوار واحد يومياً في كوب ماء كبير مع شرب وافر من السوائل على مدار اليوم.",
+                dawaaSlug: ""
+            },
+            {
+                code: "508739", nameEn: "C-RONZ PLUS ZN 30 CAPSULE", nameAr: "سي رونز بلس زنك 30 كبسولة", cat: "فيتامينات ومناعة", listClass: "Diamond", form: "capsules",
+                composition: "فيتامين سي (Ascorbic Acid) + زنك (Zinc) في كبسولات جيلاتينية سهلة البلع.",
+                info: "بديل عملي للأقراص الفوارة لمن يعانون من حساسية المعدة للفوار أو يفضلون الكبسولات لدعم المناعة اليومي وصحة الجلد.",
+                counseling: "كبسولة واحدة يومياً بعد الوجبة الرئيسية مع كوب ماء كامل.",
+                dawaaSlug: "c-ronz-plus-zn-dietary-supplement-30-capsules"
+            },
+            {
+                code: "508490", nameEn: "DIVA LIFE 60 CAPSULE", nameAr: "ديفا لايف 60 كبسولة", cat: "صحة المرأة والحوامل", listClass: "GOLD", form: "capsules",
+                composition: "مجموعة متكاملة من الفيتامينات والمعادن الأساسية للمرأة (حديد، فوليك أسيد، بيوتين، زنك، فيتامينات B و D و E، ومضادات أكسدة).",
+                info: "مصمم خصيصاً لدعم صحة المرأة، موازنة النشاط الهرموني، تقليل الإرهاق اليومي، وتغذية الشعر والبشرة والأظافر.",
+                counseling: "كبسولة إلى كبسولتين يومياً بعد الغداء. يفضل فصله عن الشاي والقهوة ومنتجات الكالسيوم بساعتين.",
+                dawaaSlug: "diva-life-food-supplement-for-hair-skin-60-capsules"
+            },
+            {
+                code: "509480", nameEn: "EARZAC DAILY CLEAN 30 ML", nameAr: "إيرزاك بخاخ الأذن للتنظيف اليومي 30 مل", cat: "أنف وأذن وحنجرة", listClass: "Diamond", form: "spray",
+                composition: "محلول ملحي متوازن ومنقّى لطيف على قناة الأذن الخارجية بدون مواد حافظة قاسية.",
+                info: "بخاخ للعناية اليومية بنظافة الأذن، يمنع تراكم الشمع والأتربة، وبديل آمن وطبي للأعواد القطنية التي تدفع الشمع للداخل.",
+                counseling: "يُرش 1-2 بخة في كل أذن من 2-3 مرات أسبوعياً مع إمالة الرأس ومسح السائل الخارج بلطف. مناسب لمستخدمي السماعات الطبية والسباحين.",
+                dawaaSlug: ""
+            },
+            {
+                code: "509481", nameEn: "EARZAC EAR WAX 15 ML", nameAr: "إيرزاك بخاخ الأذن لإذابة الشمع 15 مل", cat: "أنف وأذن وحنجرة", listClass: "Diamond", form: "spray",
+                composition: "زيوت طبيعية ومواد مذيبة لشمع الأذن المتراكم (Cerumenolytic formula) مع عوامل مرطبة لقناة الأذن.",
+                info: "يعمل على تليين وإذابة سدادات شمع الأذن المتصلبة لتسهيل خروجها تلقائياً أو تحضيرها للغسيل الطبي دون ألم.",
+                counseling: "1-2 بخة في الأذن المصابة مرتين يومياً لمدة 3 إلى 5 أيام مع إبقاء الرأس مائلاً لعدة دقائق. لا يستخدم في حالة وجود ثقب بطبلة الأذن.",
+                dawaaSlug: ""
+            },
+            {
+                code: "509482", nameEn: "EARZAC ITCH RELIEF 20 ML", nameAr: "إيرزاك بخاخ الأذن لتهدئة الحكة 20 مل", cat: "أنف وأذن وحنجرة", listClass: "Diamond", form: "spray",
+                composition: "مستخلصات عشبية مهدئة وزيوت مرطبة مضادة للتهيج والجفاف في قناة الأذن الخارجية.",
+                info: "يهدئ فوراً الحكة والاحمرار والتهيج الناتج عن جفاف قناة الأذن، الإكزيما الموضعية، أو استخدام سماعات الأذن لفترات طويلة.",
+                counseling: "بخة واحدة في الأذن عند اللزوم (1-2 مرة يومياً). تجنب إدخال أي أداة حادة أو أعواد قطنية داخل الأذن.",
+                dawaaSlug: ""
+            },
+            {
+                code: "507985", nameEn: "GENIUS 250 ML SYRUP", nameAr: "جينيس 250 مل شراب", cat: "أطفال وفواتح شهية", listClass: "Diamond", form: "syrup",
+                composition: "عسل نقي + اللبأ البقري (Colostrum) + خلاصة البروبوليس / العكبر (Propolis) + فيتامينات متعددة للأطفال.",
+                info: "شراب طبيعي فاتح للشهية ومقوٍ عام للمناعة والتركيز عند الأطفال؛ اللبأ والبروبوليس يوفران أجساماً مضادة طبيعية تحمي الطفل من العدوى المتكررة.",
+                counseling: "5 مل إلى 10 مل يومياً (يفضل صباحاً قبل الإفطار أو الغداء). يرج جيداً قبل الاستخدام.",
+                dawaaSlug: "genius-syrup-honey-with-colostrum-propolis-250-ml"
+            },
+            {
+                code: "507982", nameEn: "GINKOZAC 30 CAPSULE", nameAr: "جينكوزاك 30 كبسولة", cat: "ذاكرة وتركيز", listClass: "Diamond", form: "capsules",
+                composition: "خلاصة أوراق الجنكة بيلوبا المعيارية (Ginkgo Biloba Extract) بتركيز داعم للدورة الدموية المخية والطرفية.",
+                info: "يحسن تدفق الدم والأكسجين لخلايا المخ والأطراف، مما يعزز الذاكرة والانتباه، ويقلل من طنين الأذن، الدوخة، وبرودة الأطراف.",
+                counseling: "كبسولة واحدة إلى كبسولتين يومياً مع الوجبات. يُنصح بالحذر واستشارة الطبيب لمن يتناولون مسيلات الدم القوية (مثل الوارفارين).",
+                dawaaSlug: "ginkozac-food-supplement-general-tonic-30-capsules"
+            },
+            {
+                code: "508517", nameEn: "GINKOWELL 60 CAPSULE", nameAr: "جينكويل 60 كبسولة", cat: "ذاكرة وتركيز", listClass: "Diamond", form: "capsules",
+                composition: "غذاء ملكات النحل (Royal Jelly) + خلاصة الجنكة بيلوبا (Ginkgo Biloba).",
+                info: "مقوٍ عام مزدوج يجمع بين تنشيط الدورة الدموية الذهنية والطرفية (بالجنكة) وتجديد الطاقة الحيوية والنشاط البدني (بغذاء الملكات).",
+                counseling: "كبسولة إلى 3 كبسولات يومياً (يفضل صباحاً وبعد الغداء لتجنب الأرق ليلاً).",
+                dawaaSlug: "ginkowell-general-tonic-for-men-60-capsules"
+            },
+            {
+                code: "508068", nameEn: "IVYZAC PLUS 100 ML SYRUP", nameAr: "إيفيزاك بلس 100 مل شراب", cat: "جهاز تنفسي وسعال", listClass: "Diamond", form: "syrup",
+                composition: "خلاصة أوراق اللبلاب الجافة (Ivy Leaf Extract) الغنية بالصابونين + خلاصة الزعتر والأعشاب الطبيعية المهدئة للسعال.",
+                info: "يعمل بفعالية ثلاثية: يذيب البلغم اللزج، يوسع الشعب الهوائية، ويهدئ السعال الجاف والمصحوب ببلغم للكبار والأطفال.",
+                counseling: "للأطفال: 2.5 - 5 مل من 2-3 مرات يومياً. للكبار: 5 - 7.5 مل 3 مرات يومياً. خالٍ من الكحول ولا يسبب النعاس.",
+                dawaaSlug: "ivyzac-plus-syrup-relieves-cough-100-ml"
+            },
+            {
+                code: "507984", nameEn: "MARVELOUS ENERGY 20 VIALS 500 ML", nameAr: "مارفيلوس انيرجي 20 فيال", cat: "نشاط وطاقة", listClass: "Diamond", form: "vials",
+                composition: "غذاء ملكات النحل (Royal Jelly) + خلاصة جذور الماكا (Maca Extract) في قوارير شرب بنكهة الليمون.",
+                info: "تركيبة فورية لاستعادة النشاط البدني والذهني، مقاومة الإجهاد المزمن، وتعزيز القدرة والحيوية لدى الرجال والرياضيين.",
+                counseling: "تؤخذ قارورة (فيال) واحدة يومياً في الصباح قبل الإفطار. ترج القارورة جيداً قبل الشرب.",
+                dawaaSlug: "marvelous-energy-food-supplement-royal-jelly-maca-20-vials"
+            },
+            {
+                code: "508726", nameEn: "NEPHROZAC 30 CAPSULE", nameAr: "نيفروزاك 30 كبسولة", cat: "مسالك بولية", listClass: "GOLD", form: "capsules",
+                composition: "زيت إكليل الجبل / الروزماري (Rosemary Oil) 84 مجم + زيت الشمر (Fennel Oil) 46 مجم + زيت الزيتون النقي.",
+                info: "مطهر ومضاد لتقلصات المسالك البولية، يساعد على إدرار البول وطرد الأملاح والترسبات والحصوات الصغيرة من الكلى والحالب.",
+                counseling: "كبسولة 3 مرات يومياً قبل الأكل مع شرب كوبين من الماء، والالتزام بشرب 2-3 لتر ماء يومياً.",
+                dawaaSlug: "nephrozac-dietary-supplements-with-rosemary-30-capsules"
+            },
+            {
+                code: "508727", nameEn: "NEPHROZAC 100 CAPSULE", nameAr: "نيفروزاك 100 كبسولة", cat: "مسالك بولية", listClass: "Diamond", form: "capsules",
+                composition: "زيت إكليل الجبل / الروزماري (Rosemary Oil) 84 مجم + زيت الشمر (Fennel Oil) 46 مجم + زيت الزيتون النقي (عبوة التوفير 100 كبسولة).",
+                info: "يعمل كمضاد طبيعي للبكتيريا والالتهابات في مجرى البول، يريح مغص الكلى والحالب، ويمنع تكوّن الحصوات المتكررة.",
+                counseling: "كبسولة 3 مرات يومياً مع كمية وافرة من الماء. العبوة 100 كبسولة مثالية لمرضى الأملاح والحصوات المتكررة.",
+                dawaaSlug: "nephrozac-dietary-supplements-with-rosemary-100-capsules"
+            },
+            {
+                code: "507369", nameEn: "OMEGAT 1000MG 30 SOFT CAPSULES", nameAr: "أوميجات 1000 مجم 30 كبسولة", cat: "أوميجا وصحة القلب", listClass: "Diamond", form: "capsules",
+                composition: "زيت سمك نقي 1000 مجم غني بالأحماض الدهنية الأساسية أوميجا-3 (EPA & DHA).",
+                info: "يدعم صحة القلب والأوعية الدموية، يساعد في خفض الدهون الثلاثية (Triglycerides)، ويعزز التركيز وصحة المفاصل والعين.",
+                counseling: "كبسولة إلى كبسولتين يومياً وسط الوجبة المحتوية على دهون صحية لضمان أعلى امتصاص ومنع التجشؤ بطعم السمك.",
+                dawaaSlug: "omegat-omega-3-1000-mg-30-capsules"
+            },
+            {
+                code: "508508", nameEn: "OMEGAT 1000 MG 60 SOFT CAPSULE", nameAr: "أوميجات 1000 مجم 60 كبسولة", cat: "أوميجا وصحة القلب", listClass: "Diamond", form: "capsules",
+                composition: "زيت سمك بحري نقي 1000 مجم غني بـ EPA و DHA (عبوة 60 كبسولة جيلاتينية رخوة).",
+                info: "يحمي الشرايين، يدعم وظائف الدماغ والذاكرة، ويساعد في تقليل الالتهابات المزمنة وجفاف العين.",
+                counseling: "كبسولة واحدة إلى كبسولتين يومياً مع الوجبات الرئيسية. تبلع كاملة بدون مضغ.",
+                dawaaSlug: ""
+            },
+            {
+                code: "508421", nameEn: "OMEGAT 200 ML SYRUP", nameAr: "أوميجات 200 مل شراب", cat: "أطفال وفواتح شهية", listClass: "Diamond", form: "syrup",
+                composition: "زيت السمك النقي الغني بـ DHA و EPA لشراب الأطفال بنكهة الفواكه المقبولة بدون زفارة.",
+                info: "يدعم التطور الذهني والبصري للأطفال، يزيد من قوة التركيز والتحصيل الدراسي، ويساعد في تحسين الشهية والمناعة.",
+                counseling: "5 مل يومياً بعد الوجبة. يرج جيداً قبل الاستخدام ويحفظ في مكان بارد أو بالثلاجة بعد الفتح.",
+                dawaaSlug: ""
+            },
+            {
+                code: "507981", nameEn: "PAX NIGHT 30 CAPSULE", nameAr: "باكس نايت 30 كبسولة", cat: "التوتر والنوم", listClass: "Diamond", form: "capsules",
+                composition: "خلاصة جذور الفاليريان / الناردين (Valerian Root) 320 مجم + خلاصة أوراق الميليسا (Melissa / Lemon Balm) 160 مجم.",
+                info: "مهدئ عشبي طبيعي 100% وغير إدماني؛ يعمل على تهدئة الجهاز العصبي المركزي، إزالة القلق والتوتر، والدخول في نوم عميق ومريح.",
+                counseling: "قرص/كبسولة واحدة يومياً قبل موعد النوم بـ 30 إلى 60 دقيقة. لا يسبب التعود أو الخمول في صباح اليوم التالي.",
+                dawaaSlug: "pax-night-dietary-supplement-food-supplement-30-tablets"
+            },
+            {
+                code: "509338", nameEn: "REPROST PLUS 30 CAPSULE", nameAr: "رونزافيت ري بروست بلس 30 كبسولة", cat: "صحة الرجل والبروستاتا", listClass: "Diamond", form: "capsules",
+                composition: "زيت بذور اليقطين 333 مجم + مركز نبات القراص (Nettle) 283 مجم + البلميط المنشاري (Saw Palmetto) 106.7 مجم + الطماطم (ليكوبين) 100 مجم + الرمان 33 مجم.",
+                info: "تركيبة خماسية طبيعية لعلاج أعراض تضخم البروستاتا الحميد (BPH)، تقليل تكرار التبول الليلي، وتحسين تدفق البول لدى الرجال.",
+                counseling: "كبسولة واحدة 3 مرات يومياً بعد الوجبات. آمن جداً للاستخدام طويل الأمد ولا يؤثر سلباً على القدرة الجنسية.",
+                dawaaSlug: "ronzavit-reprost-plus-dietary-supplement-prostate-health-30-capsules"
+            },
+            {
+                code: "507442", nameEn: "ROHELAR 50 GM OINTMENT", nameAr: "روهيلار 50 جم مرهم (بواسير)", cat: "الجهاز الهضمي", listClass: "Diamond", form: "ointment",
+                composition: "مستخلصات عشبية قابضة للأوعية الدموية ومضادة للالتهاب والاحتقان الموضعي مع زيوت ملطفة ومرطبة.",
+                info: "مرهم موضعي لعلاج البواسير الداخلية والخارجية والشروخ الشرجية؛ يخفف الألم والحكة والاحتقان ويساعد على وقف النزيف السطحي.",
+                counseling: "يُدهن موضعياً مرتين يومياً (صباحاً ومساءً وبعد كل عملية إخراج). يُنصح بالإكثار من الألياف والماء لتجنب الإمساك.",
+                dawaaSlug: "rohelar-ointment-hemorrhoids-50-gm"
+            },
+            {
+                code: "508067", nameEn: "ROHELAR 10 SUPPOSITORIES", nameAr: "روهيلار 10 تحاميل (بواسير)", cat: "الجهاز الهضمي", listClass: "Diamond", form: "ointment",
+                composition: "تركيبة عشبية طبيعية مضادة لاحتقان الأوردة الشرجية وملطفة للأغشية المخاطية في صورة تحاميل شرجية.",
+                info: "تستهدف البواسير الداخلية بفعالية، تقلل التورم والألم أثناء التبرز، وتسرع من التئام الأنسجة المتهيجة.",
+                counseling: "تحميلة شرجية واحدة صباحاً ومساءً بعد الإخراج. يمكن الجمع بين التحاميل والمرهم في الحالات الحادة.",
+                dawaaSlug: ""
+            },
+            {
+                code: "509390", nameEn: "RON-GUM HAIR AND NAIL 60 GUMMIES", nameAr: "رون-جم للشعر والأظافر 60 حبة", cat: "حلاو جيلاتيني (Gummies)", listClass: "Diamond", form: "gummies",
+                composition: "بيوتين (Biotin) + زنك + فيتامين C و E و B6 وحمض الفوليك في حلوى جيلاتينية لذيذة المذاق.",
+                info: "يغذي بصيلات الشعر من الداخل، يقلل التساقط والتقصف، ويعزز لمعان الشعر وقوة الأظافر والجلد بطريقة سهلة ومحببة.",
+                counseling: "مضغ حبتين يومياً بعد الأكل. ممتاز لمن يجدون صعوبة في بلع الكبسولات التقليدية.",
+                dawaaSlug: ""
+            },
+            {
+                code: "509391", nameEn: "RON-GUM CALCIUM 60 GUMMIES", nameAr: "رون-جم كالسيوم 60 حبة", cat: "حلاو جيلاتيني (Gummies)", listClass: "Diamond", form: "gummies",
+                composition: "كالسيوم (Calcium) + فيتامين د3 (Vitamin D3) + فسفور في قطع جيلاتينية قابلة للمضغ.",
+                info: "يدعم بناء العظام والأسنان القوية لدى الأطفال والبالغين، ووجود فيتامين د3 يضمن الامتصاص الأمثل للكالسيوم.",
+                counseling: "مضغ حبتين يومياً مع الوجبات. يُحفظ بعيداً عن متناول الأطفال الصغار لشكله المشابه للحلوى.",
+                dawaaSlug: ""
+            },
+            {
+                code: "509401", nameEn: "RON-GUM ASHWAGANDHA 60 GUMMIES", nameAr: "رون-جم اشواجندا 60 حبة", cat: "التوتر والنوم", listClass: "Diamond", form: "gummies",
+                composition: "مستخلص جذور الأشواجندا الطبيعية (Ashwagandha Extract) + فيتامين د وفيتامينات داعمة للاسترخاء.",
+                info: "يساعد الجسم على التكيف مع الضغوط النفسية والعصبية، يخفض مستويات هرمون الكورتيزول (هرمون التوتر)، ويحسن المزاج وجودة النوم.",
+                counseling: "مضغ حبتين يومياً (يفضل في المساء أو بعد يوم عمل شاق).",
+                dawaaSlug: ""
+            },
+            {
+                code: "509392", nameEn: "RON-GUM IRON 60 GUMMIES", nameAr: "رون-جم حديد 60 حبة", cat: "حلاو جيلاتيني (Gummies)", listClass: "Diamond", form: "gummies",
+                composition: "حديد لطيف على المعدة + فيتامين C (لزيادة الامتصاص) + فيتامين B12 وحمض الفوليك.",
+                info: "يعالج ويقي من أنيميا نقص الحديد والخمول والدوخة، دون التسبب في طعم معدني مزعج أو إمساك شديد.",
+                counseling: "مضغ حبتين يومياً بعد الغداء، مع تجنب الشاي والقهوة والحليب لمدة ساعتين.",
+                dawaaSlug: ""
+            },
+            {
+                code: "509396", nameEn: "RON-GUM KIDS MULTIVITAMIN 60 GUMMIES", nameAr: "رون-جم فيتامينات متعددة للأطفال 60 حبة", cat: "أطفال وفواتح شهية", listClass: "Diamond", form: "gummies",
+                composition: "مجموعة متكاملة من الفيتامينات الأساسية لنمو الطفل (A, C, D3, E, B-Complex, Zinc, Iodine).",
+                info: "يعوض نقص العناصر الغذائية عند الأطفال الانتقائيين في الطعام (Picky Eaters)، يدعم المناعة، النمو الحركي، والتركيز.",
+                counseling: "حبة إلى حبتين مضغ يومياً للأطفال فوق عمر 3 سنوات تحت إشراف الوالدين.",
+                dawaaSlug: ""
+            },
+            {
+                code: "509405", nameEn: "RON-GUM MELATONIN 60 GUMMIES", nameAr: "رون-جم ميلاتونين 60 حبة", cat: "التوتر والنوم", listClass: "Diamond", form: "gummies",
+                composition: "ميلاتونين نقي (Melatonin) لضبط الساعة البيولوجية في قطع جيلاتينية سريعة الامتصاص.",
+                info: "يساعد على الدخول السريع في النوم، يعالج الأرق واضطرابات النوم الناتجة عن السفر (Jet Lag) أو العمل بنظام الشفتات.",
+                counseling: "مضغ حبة إلى حبتين قبل النوم بـ 30 دقيقة مع إغلاق الإضاءة والشاشات لتحفيز مفعول الميلاتونين.",
+                dawaaSlug: ""
+            },
+            {
+                code: "509394", nameEn: "RON-GUM MULTIVITAMIN 60 GUMMIES", nameAr: "رون-جم فيتامينات متعددة 60 حبة", cat: "حلاو جيلاتيني (Gummies)", listClass: "Diamond", form: "gummies",
+                composition: "فيتامينات ومعادن يومية شاملة للبالغين (فيتامينات A, C, D, E, B6, B12, Biotin, Zinc).",
+                info: "يدعم النشاط اليومي، المناعة، والحيوية العامة في صورة قطع جيلاتينية لذيذة وسهلة التناول.",
+                counseling: "مضغ حبتين يومياً بعد وجبة الإفطار أو الغداء.",
+                dawaaSlug: ""
+            },
+            {
+                code: "508523", nameEn: "RON-H HAIR COLLAGEN 30 VIALS", nameAr: "رون إتش كولاجين للشعر 30 فيال", cat: "شعر وأظافر", listClass: "Diamond", form: "vials",
+                composition: "كولاجين متحلل عالي التركيز مخصص للشعر + بيوتين + زنك + سيلينيوم وفيتامينات بنكهة الخوخ (30 فيال).",
+                info: "شراب كولاجين مركز يغذي جذور الشعر بعمق، يرمم الشعر التالف والمصبوغ، ويزيد من سمك الشعرة ولمعانها.",
+                counseling: "شرب فيال واحد يومياً (يفضل بعد وجبة الإفطار أو المساء). كورس 30 فيال يكفي شهراً كاملاً.",
+                dawaaSlug: "ron-h-hair-collagen-food-supplement-peach-30-vials"
+            },
+            {
+                code: "508524", nameEn: "RON-H HAIR COLLAGEN 20 VIALS", nameAr: "رون إتش كولاجين للشعر 20 فيال", cat: "شعر وأظافر", listClass: "Diamond", form: "vials",
+                composition: "كولاجين بحري/متحلل للشعر + بيوتين + زنك وفيتامينات مغذية لبصيلات الشعر بنكهة الخوخ (عبوة 20 فيال).",
+                info: "يعزز مرونة وقوة الشعر ويقلل التساقط بفضل الامتصاص السريع للكولاجين السائل مقارنة بالأقراص.",
+                counseling: "فيال واحد يومياً للشرب مباشرة أو مخففاً بالماء. يرج جيداً قبل الفتح.",
+                dawaaSlug: ""
+            },
+            {
+                code: "508521", nameEn: "RON-J JOINT COLLAGEN 30 VIALS", nameAr: "رون جي كولاجين للمفاصل 30 فيال", cat: "عظام ومفاصل", listClass: "Diamond", form: "vials",
+                composition: "كولاجين متحلل داعم للمفاصل + جلوكوزامين + كوندرويتين + فيتامين C و D بنكهة الكرز (30 فيال).",
+                info: "يدعم إعادة بناء غضاريف الركبة والمفاصل، يقلل الاحتكاك والخشونة، ويحسن المرونة الحركية لدى كبار السن والرياضيين.",
+                counseling: "فيال واحد يومياً بعد الأكل. الاستمرار لمدة 1-3 أشهر يعطي تحسناً ملحوظاً في راحة المفصل.",
+                dawaaSlug: "ron-j-collagen-food-supplement-cherry-30-vials"
+            },
+            {
+                code: "508522", nameEn: "RON-J JOINT COLLAGEN 20 VIALS", nameAr: "رون جي كولاجين للمفاصل 20 فيال", cat: "عظام ومفاصل", listClass: "Diamond", form: "vials",
+                composition: "كولاجين سائل للمفاصل والغضاريف + فيتامين سي وعناصر داعمة للمفصل بنكهة الكرز (عبوة 20 فيال).",
+                info: "يمد الغضاريف والأوتار بالأحماض الأمينية اللازمة لتجديدها وتخفيف آلام الخشونة والتهاب المفاصل.",
+                counseling: "فيال واحد يومياً بعد الوجبة. يرج جيداً قبل الاستخدام.",
+                dawaaSlug: ""
+            },
+            {
+                code: "508519", nameEn: "RON-S SKIN COLLAGEN 30 VIALS", nameAr: "رون إس كولاجين للبشرة 30 فيال", cat: "جلدية وجروح", listClass: "Diamond", form: "vials",
+                composition: "ببتيدات الكولاجين البحري/المتحلل للبشرة + حمض الهيالورونيك + فيتامين C و E والبيوتين بنكهة الفراولة (30 فيال).",
+                info: "يشد البشرة، يقلل الخطوط الدقيقة والتجاعيد، ويعيد النضارة والترطيب العميق والمرونة للجلد من الداخل.",
+                counseling: "فيال واحد يومياً. يُنصح بشرب كمية كافية من الماء يومياً لتعزيز مفعول الهيالورونيك والكولاجين.",
+                dawaaSlug: "ron-s-collagen-food-supplement-strawberry-30-vials"
+            },
+            {
+                code: "508520", nameEn: "RON-S SKIN COLLAGEN 20 VIALS", nameAr: "رون إس كولاجين للبشرة 20 فيال", cat: "جلدية وجروح", listClass: "Diamond", form: "vials",
+                composition: "كولاجين سائل لنضارة البشرة + هيالورونيك أسيد + فيتامين C ومضادات أكسدة بنكهة الفراولة (20 فيال).",
+                info: "يحفز إنتاج الكولاجين الطبيعي والإيلاستين في طبقات الجلد لمظهر شبابي ومشرق.",
+                counseling: "فيال واحد يومياً، ويمكن تناوله بارداً لمذاق أفضل.",
+                dawaaSlug: ""
+            },
+            {
+                code: "508007", nameEn: "RONBON 250 ML SYRUP", nameAr: "رونبون 250 مل شراب", cat: "أطفال وفواتح شهية", listClass: "Diamond", form: "syrup",
+                composition: "كالسيوم (Calcium) + فيتامين د3 (Vitamin D3) + ماغنيسيوم وزنك بطعم البرتقال المحبب للأطفال.",
+                info: "شراب متكامل لنمو العظام والأسنان في مرحلة التسنين والمشي، والوقاية من الكساح ولين العظام عند الأطفال.",
+                counseling: "5 مل إلى 10 مل يومياً بعد الوجبة. يرج جيداً قبل كل استخدام، ويفصل عن شراب الحديد بساعتين.",
+                dawaaSlug: "ronbon-calcium-vitamin-d-for-bone-health-orange-taste-250-ml"
+            },
+            {
+                code: "508061", nameEn: "RONDIET 60 CAPSULE", nameAr: "روندايت 60 كبسولة", cat: "تخسيس ورشاقة", listClass: "Diamond", form: "capsules",
+                composition: "خلاصة ذيل الحصان (Horsetail) 150 مجم + مستخلص الشاي الأخضر (Green Tea) 150 مجم + مستخلص الشاي الأحمر (Red Tea) 150 مجم.",
+                info: "تركيبة عشبية ثلاثية تساعد على رفع معدل الحرق (Metabolism)، أكسدة الدهون المتراكمة، وتخليص الجسم من السوائل المحتبسة (Water Retention).",
+                counseling: "كبسولة مرتين يومياً قبل الوجبات الرئيسية بـ 30 دقيقة مع كوب كبير من الماء ونظام غذائي منخفض السعرات.",
+                dawaaSlug: "rondiet-food-supplement-60-capsules"
+            },
+            {
+                code: "508525", nameEn: "RONFIT 30 CAPSULE", nameAr: "رونفيت 30 كبسولة", cat: "تخسيس ورشاقة", listClass: "Diamond", form: "capsules",
+                composition: "ألياف طبيعية ومستخلصات عشبية حارقة للدهون ومثبطة للشهية (مثل الجارسينيا والشاي الأخضر والكروميوم).",
+                info: "يساعد في التحكم بالشهية وتقليل الرغبة في تناول السكريات والنشويات، مع تحفيز حرق الدهون لإدارة الوزن.",
+                counseling: "كبسولة قبل الوجبة الرئيسية بنصف ساعة مع كوبين من الماء.",
+                dawaaSlug: ""
+            },
+            {
+                code: "508149", nameEn: "RONGARLIC 60 CAP", nameAr: "رونجارليك 60 كبسولة", cat: "أوميجا وصحة القلب", listClass: "Diamond", form: "capsules",
+                composition: "مستخلص الثوم النقي عديم الرائحة (Odorless Garlic Extract) + أوميجا 3.",
+                info: "يدعم صحة القلب والشرايين، يساعد في تنظيم ضغط الدم وخفض الكوليسترول الضار (LDL)، ويرفع مناعة الجسم ضد العدوى.",
+                counseling: "كبسولة مرتين يومياً مع الوجبات. يتميز بأنه عديم الرائحة ولا يسبب تغيراً في رائحة الفم أو العرق.",
+                dawaaSlug: "rongarlic-food-supplement-60-capsules"
+            },
+            {
+                code: "508165", nameEn: "RONOSE ALOVERA MENT ADULT 30ML", nameAr: "رونوز ألوفيرا منتول 30 مل للكبار", cat: "أنف وأذن وحنجرة", listClass: "Diamond", form: "spray",
+                composition: "محلول ملحي هايبرتونيك (Hypertonic Sea Water) + خلاصة الصبار (Aloe Vera) + المنثول المنعش (Menthol).",
+                info: "بخاخ أنف للكبار يزيل احتقان الأنف والجيوب الأنفية بالخاصية الأسموزية، بينما يهدئ الصبار الأغشية الملتهبة ويمنح المنثول إحساساً فورياً بفتح التنفس.",
+                counseling: "1-2 بخة في كل فتحة أنف 2-3 مرات يومياً. لا يسبب التعود الدوائي (Rebound Congestion) مثل البخاخات الكيميائية.",
+                dawaaSlug: "ronose-hypertonic-nasal-spray-decongestant-adults-30-ml"
+            },
+            {
+                code: "508166", nameEn: "RONOSE HYPERTONIC 120ML +3", nameAr: "رونوز هايبرتونيك 120 مل +3", cat: "أنف وأذن وحنجرة", listClass: "Diamond", form: "spray",
+                composition: "محلول مياه بحر نقية عالي التركيز (Hypertonic Saline Solution) خالٍ من المواد الحافظة.",
+                info: "يسحب السوائل الزائدة من الأغشية المخاطية المتورمة ليفتح الأنف المسدود ويطرد المخاط الكثيف والمسببات التحسسية للأطفال فوق 3 سنوات والكبار.",
+                counseling: "1-2 بخة في كل فتحة أنف عند اللزوم. آمن للاستخدام المتكرر في نزلات البرد والتهاب الجيوب الأنفية.",
+                dawaaSlug: ""
+            },
+            {
+                code: "508167", nameEn: "RONOSE HYPERTONIC 30ML +6", nameAr: "رونوز هايبرتونيك 30 مل +6", cat: "أنف وأذن وحنجرة", listClass: "Diamond", form: "spray",
+                composition: "محلول ملحي عالي التركيز (Hypertonic) بحجم عملي مناسب للحمل (30 مل) للأطفال من عمر 6 أشهر فأكثر.",
+                info: "مزيل طبيعي لاحتقان الأنف يساعد الطفل على التنفس المريح والنوم والرضاعة دون انسداد أنفي.",
+                counseling: "بخة واحدة في كل فتحة أنف قبل الرضاعة أو النوم مع تنظيف الأنف بلطف.",
+                dawaaSlug: ""
+            },
+            {
+                code: "511347", nameEn: "RONOSE PED. NASAL DROPS 20 ML", nameAr: "رونوز نقط للأنف كلوريد الصوديوم 20 مل", cat: "أنف وأذن وحنجرة", listClass: "GOLD", form: "drops",
+                composition: "كلوريد الصوديوم متعادل التركيز (Isotonic Sodium Chloride 0.9%) نقط أنف للرضع وحديثي الولادة.",
+                info: "يرطب تجويف الأنف الجاف ويذيب الإفرازات المخاطية المتصلبة لدى الرضع منذ اليوم الأول للولادة بأمان تام.",
+                counseling: "2-3 نقط في كل فتحة أنف قبل الرضاعة بـ 10 دقائق لتسهيل تنفس الرضيع أثناء الرضاعة.",
+                dawaaSlug: ""
+            },
+            {
+                code: "508163", nameEn: "RONOSE PEDIATRIC ISOTONIC 120ML", nameAr: "رونوز ايزوتونيك 120 مل بخاخ رضع", cat: "أنف وأذن وحنجرة", listClass: "Diamond", form: "spray",
+                composition: "محلول مياه بحر متعادل التركيز (Isotonic Sea Water) مزود ببخاخ ذي فوهة لطيفة مخصصة لأنف الرضع والأطفال.",
+                info: "للغسيل والترطيب اليومي للأنف، الوقاية من التهابات الأذن الوسطى ونزلات البرد، وتنظيف الأنف من الغبار وحبوب اللقاح.",
+                counseling: "يُمال رأس الطفل على الجانب وتُعطى بخة لطيفة في كل فتحة أنف ثم يُمسح الأنف.",
+                dawaaSlug: ""
+            },
+            {
+                code: "508164", nameEn: "RONOSE PEDIATRIC ISOTONIC 30ML", nameAr: "رونوز ايزوتونيك 30 مل بخاخ رضع", cat: "أنف وأذن وحنجرة", listClass: "Diamond", form: "spray",
+                composition: "محلول ملحي متعادل (Isotonic) 30 مل للترطيب والتنظيف اليومي لأنف الرضع.",
+                info: "لطيف جداً على الأغشية المخاطية الحساسة للرضع، يرطب الأنف في الأجواء الجافة ومع استخدام المكيفات.",
+                counseling: "بخة واحدة في كل فتحة أنف من 2 إلى 4 مرات يومياً أو قبل الرضاعة.",
+                dawaaSlug: ""
+            },
+            {
+                code: "508161", nameEn: "RONPECT 15 CAP", nameAr: "رونبكت 15 كبسولة (علاج الإسهال)", cat: "الجهاز الهضمي", listClass: "Diamond", form: "capsules",
+                composition: "مسحوق بكتين التفاح (Apple Pectin) 320 مجم + خلاصة البابونج الجافة (Chamomile Extract) 250 مجم.",
+                info: "تركيبة طبيعية لعلاج الإسهال والتقلصات المعوية؛ البكتين يمتص السموم والمياه الزائدة في الأمعاء لتماسك البراز، والبابونج يهدئ المغص والالتهاب.",
+                counseling: "كبسولة من 2 إلى 3 مرات يومياً مع تعويض السوائل والأملاح. لا يسبب شللاً في حركة الأمعاء، مما يجعله آمناً جداً.",
+                dawaaSlug: "ronpect-systemic-relieve-diarrhea-15-capsules"
+            },
+            {
+                code: "509479", nameEn: "RONZA ASHWAGANDA 30 CAP", nameAr: "رونزا اشواجندا 30 كبسولة", cat: "التوتر والنوم", listClass: "Diamond", form: "capsules",
+                composition: "أشواجندا 433 مجم + روديولا (Rhodiola) 66.7 مجم + ميليسا 66.7 مجم + جنكة بيلوبا 40 مجم + جينسنج سيبيري 33.3 مجم + إل-ثيانين (L-Theanine) 16.67 مجم.",
+                info: "تركيبة بلس متطورة تجمع أقوى 6 مواد تكيّفية (Adaptogens) للقضاء على التوتر والقلق النفسي مع الحفاظ على صفاء الذهن والتركيز العالي.",
+                counseling: "كبسولة مرتين يومياً بعد الأكل. مثالي جداً لضغوط العمل والدراسة لأنه يهدئ الأعصاب دون أن يسبب الخمول.",
+                dawaaSlug: "ronza-ashwagandha-enhanced-stress-relief-30-capsules"
+            },
+            {
+                code: "509339", nameEn: "RONZA BREWERS YEAST 60 CAPSULE", nameAr: "رونزا خميرة البيرة 60 كبسولة", cat: "مكملات عشبية", listClass: "Diamond", form: "capsules",
+                composition: "خميرة السيلينيوم (Selenium Yeast) 200 مجم + كولاجين بحري (Marine Collagen) 100 مجم + إل-سيستين (L-Cysteine) 100 مجم + إل-ليسين (L-Lysine) 100 مجم.",
+                info: "تركيبة فريدة مطورة بكولاجين بحري وأحماض أمينية لتعزيز نضارة وامتلاء البشرة، تقوية الشعر والأظافر، ودعم البكتيريا النافعة والشهية الصحية.",
+                counseling: "كبسولة واحدة إلى كبسولتين يومياً بعد الوجبات مع شرب كمية كافية من الماء.",
+                dawaaSlug: "ronza-brewer-yeast-dietary-supplement-60-capsules"
+            },
+            {
+                code: "509337", nameEn: "RONZA FENUGREEK 60 CAPSULE", nameAr: "رونزافيت الحلبة 60 كبسولة", cat: "مكملات عشبية", listClass: "Diamond", form: "capsules",
+                composition: "مستخلص بذور الحلبة النقي المركز (Fenugreek Seed Extract) بتركيز 500 مجم لكل كبسولة.",
+                info: "مدر طبيعي قوي لحليب الأم المرضعة (Galactagogue)، فاتح للشهية، ويساعد أيضاً في تحسين حساسية الإنسولين والهضم.",
+                counseling: "كبسولتان يومياً بعد الوجبة الرئيسية مع الإكثار من شرب السوائل الدافئة والماء طوال اليوم للمرضعات.",
+                dawaaSlug: "ronzavit-fenugreek-dietary-supplement-support-lactation-60-capsules"
+            },
+            {
+                code: "510074", nameEn: "RONZA GLUCOSAMINE + MSM 100 CAP", nameAr: "رونزا الجلوكوزامين + إم إس إم 100 كبسولة", cat: "عظام ومفاصل", listClass: "Diamond", form: "capsules",
+                composition: "جلوكوزامين (Glucosamine) + ميثيل سلفونيل ميثان (MSM) بتركيز علاجي داعم للمفاصل والغضاريف.",
+                info: "يعيد بناء النسيج الغضروفي المتآكل في الركبتين والمفاصل، بينما يعمل الـ MSM كمضاد التهاب ومسكّن طبيعي لآلام الخشونة.",
+                counseling: "كبسولة مرتين يومياً وسط أو بعد الأكل لتجنب أي تهيج بالمعدة. العبوة 100 كبسولة اقتصادية جداً لكورس علاجي كامل.",
+                dawaaSlug: "ronza-glucosamine-msm-support-joint-health-100-capsules"
+            },
+            {
+                code: "509493", nameEn: "RONZA MACA 30 CAPSULE", nameAr: "رونزا ماكا 30 كبسولة", cat: "نشاط وطاقة", listClass: "Diamond", form: "capsules",
+                composition: "مستخلص جذور الماكا البيروفية النقية (Maca Root Extract) بتركيز 1000 مجم لكل كبسولة.",
+                info: "منشط عام طبيعي للرجال؛ يعزز الرغبة والقدرة الجنسية، يحسن جودة وحركة الحيوانات المنوية، ويرفع مستوى الطاقة البدنية والتحمل الرياضي.",
+                counseling: "كبسولة واحدة يومياً بعد وجبة الإفطار أو الغداء. آمن لمرضى الضغط مقارنة بالمنشطات الكيميائية.",
+                dawaaSlug: "ronza-maca-men-general-tonic-30-capsules"
+            },
+            {
+                code: "508722", nameEn: "RONZALAX SENNA LEAF 60 CAPSULE", nameAr: "رونزا لاكس 60 كبسولة (ملين)", cat: "الجهاز الهضمي", listClass: "Diamond", form: "capsules",
+                composition: "خلاصة أوراق السنا المكي الطبيعية المعيارية (Senna Leaf Extract).",
+                info: "ملين عشبي طبيعي يحفز الحركة الدودية للأمعاء الغليظة ويسهل الإخراج في حالات الإمساك العارض والحاد.",
+                counseling: "1-2 كبسولة مساءً قبل النوم مع كوب ماء كبير (يبدأ المفعول خلال 6-12 ساعة في الصباح). لا يُنصح بالاستخدام المتواصل لأكثر من أسبوعين لتجنب كسل الأمعاء.",
+                dawaaSlug: ""
+            },
+            {
+                code: "508060", nameEn: "RONZAVIT CINNAMON /ALZUCARE 60 CAPSULE", nameAr: "رونزافيت القرفة / الزوكير 60 كبسولة", cat: "تخسيس ورشاقة", listClass: "Diamond", form: "capsules",
+                composition: "خلاصة القرفة النقية المركزة (Cinnamon Bark Extract) الغنية بمضادات الأكسدة (Polyphenols).",
+                info: "يحسن حساسية الخلايا للإنسولين، يساعد في ضبط مستويات السكر في الدم، يقلل الشهية للحلويات، ويدعم حرق الدهون.",
+                counseling: "كبسولة إلى كبسولتين يومياً مع الوجبات المحتوية على كربوهيدرات. ممتاز لمرضى مقاومة الإنسولين ومرحلة ما قبل السكري.",
+                dawaaSlug: "alzucare-dietary-supplement-with-cinnamon-extract-60-capsules"
+            },
+            {
+                code: "508715", nameEn: "RONZAVIT CO Q10 100 30 CAPSULE", nameAr: "رونزافيت كو انزيم كيو 100 مجم 30 كبسولة", cat: "نشاط وطاقة", listClass: "Diamond", form: "capsules",
+                composition: "مرافق الإنزيم كيو-10 (Coenzyme Q10 / Ubiquinone) بتركيز 100 مجم (30 كبسولة).",
+                info: "عنصر أساسي لإنتاج الطاقة داخل الميتوكوندريا وخاصة في عضلة القلب، مضاد أكسدة قوي، ويمنع الآلام العضلية الناتجة عن أدوية الكوليسترول (Statins).",
+                counseling: "كبسولة واحدة يومياً وسط وجبة تحتوي على دهون (لأن CoQ10 يذوب في الدهون). ضروري جداً مع كل روشتة تحتوي على أتورفاستاتين أو روزوفاستاتين.",
+                dawaaSlug: ""
+            },
+            {
+                code: "508716", nameEn: "RONZAVIT CO Q10 100 60 CAPSULE", nameAr: "رونزافيت كو انزيم كيو 100 مجم 60 كبسولة", cat: "نشاط وطاقة", listClass: "Diamond", form: "capsules",
+                composition: "كو إنزيم كيو-10 (Coenzyme Q10) بتركيز 100 مجم (عبوة 60 كبسولة).",
+                info: "يدعم صحة القلب والأوعية الدموية، يحارب علامات التقدم في السن، يعزز الخصوبة لدى الرجال والنساء، ويساعد في الوقاية من الصداع النصفي.",
+                counseling: "كبسولة واحدة يومياً مع وجبة الغداء. العبوة 60 كبسولة تكفي لمدة شهرين.",
+                dawaaSlug: ""
+            },
+            {
+                code: "508737", nameEn: "RONZAVIT CO Q10 200 30 CAPSULE", nameAr: "رونزافيت كو انزيم كيو 200 مجم 30 كبسولة", cat: "نشاط وطاقة", listClass: "Diamond", form: "capsules",
+                composition: "كو إنزيم كيو-10 عالي التركيز (Coenzyme Q10 200 mg) — 30 كبسولة.",
+                info: "التركيز العلاجي المكثف (200 مجم) لدعم حالات ضعف الخصوبة (تحسين جودة البويضات وحركة الحيوانات المنوية)، صحة عضلة القلب، والرياضيين.",
+                counseling: "كبسولة واحدة يومياً وسط الوجبة الرئيسية.",
+                dawaaSlug: ""
+            },
+            {
+                code: "508717", nameEn: "RONZAVIT CO Q10 200 60 CAPSULE", nameAr: "رونزافيت كو انزيم كيو 200 مجم 60 كبسولة", cat: "نشاط وطاقة", listClass: "Diamond", form: "capsules",
+                composition: "كو إنزيم كيو-10 عالي التركيز (Coenzyme Q10 200 mg) — عبوة التوفير 60 كبسولة.",
+                info: "يوفر أقصى دعم لإنتاج الطاقة الخلوية، حماية الخلايا من الشوارد الحرة، وتخفيف الإجهاد البدني والعضلي المزمن.",
+                counseling: "كبسولة واحدة يومياً مع وجبة غنية بالدهون الصحية لضمان أعلى امتصاص.",
+                dawaaSlug: ""
+            },
+            {
+                code: "509386", nameEn: "RONZAVIT CYSTINE PLUS B6 120CAP", nameAr: "رونزافيت سيستين بلس 120 كبسولة", cat: "شعر وأظافر", listClass: "Diamond", form: "capsules",
+                composition: "إل-سيستين (L-Cystine) بتركيز عالٍ + فيتامين B6 (Pyridoxine) + زنك وأرجينين.",
+                info: "حجر الأساس في تصنيع بروتين الكيراتين المكون لـ 90% من الشعرة والأظافر؛ يوقف التساقط ويزيد قطر الشعرة وصلابة الأظافر.",
+                counseling: "2 إلى 4 كبسولات يومياً مقسمة مع الوجبات لمدة 3 أشهر. وجود فيتامين B6 ضروري جداً لدمج السيستين داخل بصيلة الشعر.",
+                dawaaSlug: ""
+            },
+            {
+                code: "508725", nameEn: "RONZAVIT FOLIC ACID 400 MCG 60 CAPSULE", nameAr: "رونزافيت فوليك اسيد 400 ميكرو 60 كبسولة", cat: "صحة المرأة والحوامل", listClass: "GOLD", form: "capsules",
+                composition: "حمض الفوليك (Folic Acid / Vitamin B9) بتركيز 400 ميكروجرام (60 كبسولة).",
+                info: "ضروري لانقسام الخلايا، تكوين كرات الدم الحمراء، والوقاية من تشوهات الأنبوب العصبي للجنين قبل وأثناء الأشهر الأولى من الحمل.",
+                counseling: "كبسولة واحدة يومياً (يُنصح بالبدء به قبل التخطيط للحمل بـ 3 أشهر وخلال الثلث الأول من الحمل).",
+                dawaaSlug: ""
+            },
+            {
+                code: "508738", nameEn: "RONZAVIT FOLIC ACID 400 MCG 100 CAPSULE", nameAr: "رونزافيت فوليك اسيد 400 ميكرو 100 كبسولة", cat: "صحة المرأة والحوامل", listClass: "Diamond", form: "capsules",
+                composition: "حمض الفوليك (Folic Acid) بتركيز 400 ميكروجرام (عبوة اقتصادية 100 كبسولة).",
+                info: "يدعم صحة الحامل والجنين، يساعد في علاج أنيميا نقص الفولات، ويخفض مستويات الهوموسيستين لدعم صحة القلب.",
+                counseling: "كبسولة واحدة يومياً في نفس الموعد مع أو بدون طعام.",
+                dawaaSlug: ""
+            },
+            {
+                code: "508719", nameEn: "RONZAVIT GINKOBILOBA 120 60 CAPSULE", nameAr: "رونزافيت جينكوبيلوبا 120 كبسولة", cat: "ذاكرة وتركيز", listClass: "Diamond", form: "capsules",
+                composition: "خلاصة الجنكة بيلوبا المركزة (Ginkgo Biloba 120 mg) لكل كبسولة.",
+                info: "تركيز 120 مجم قوي بقرص واحد يومياً لتحسين التروية الدموية للدماغ، تقوية الذاكرة والتركيز، وعلاج الدوار وطنين الأذن.",
+                counseling: "كبسولة واحدة يومياً بعد الإفطار أو الغداء.",
+                dawaaSlug: ""
+            },
+            {
+                code: "508720", nameEn: "RONZAVIT GLUTATHIONE 60 CAPSULE", nameAr: "رونزافيت جلوتاثيون 60 كبسولة", cat: "مضادات أكسدة (Anti Oxidants)", listClass: "Diamond", form: "capsules",
+                composition: "إل-جلوتاثيون مختزل نقي (L-Glutathione) مدعم بمضادات الأكسدة.",
+                info: "سيد مضادات الأكسدة (Master Antioxidant)؛ ينقي الكبد والجسم من السموم، يثبط إنزيم التيروزيناز لتفتيح وتوحيد لون البشرة وعلاج التصبغات.",
+                counseling: "كبسولة إلى كبسولتين يومياً. يُنصح بشدة بتناوله مع فيتامين C (مثل سي-رونز) لأنه يضاعف امتصاص وفعالية الجلوتاثيون داخل الجسم.",
+                dawaaSlug: ""
+            },
+            {
+                code: "508724", nameEn: "RONZAVIT IRON 60 CAPSULE", nameAr: "رونزافيت حديد 60 كبسولة", cat: "فيتامينات ومناعة", listClass: "GOLD", form: "capsules",
+                composition: "حديد عالي الامتصاص ولطيف على الجهاز الهضمي (60 كبسولة).",
+                info: "يرفع مخزون الحديد (Ferritin) ومستوى الهيموجلوبين في الدم، ويعالج أعراض الأنيميا مثل الإرهاق، شحوب الوجه، وتساقط الشعر.",
+                counseling: "كبسولة واحدة يومياً بعد الغداء مع عصير برتقال أو فيتامين C، مع الفصل ساعتين عن الكالسيوم والشاي والقهوة.",
+                dawaaSlug: "ronzavit-dietary-supplement-iron-60-capsules"
+            },
+            {
+                code: "508740", nameEn: "RONZAVIT L-ARGININE 700 60 CAPSULE", nameAr: "رونزافيت ال - أرجنين 700 60 كبسولة", cat: "نشاط وطاقة", listClass: "Diamond", form: "capsules",
+                composition: "الحمض الأميني إل-أرجينين (L-Arginine) بتركيز 700 مجم لكل كبسولة.",
+                info: "يتحول في الجسم إلى أكسيد النيتريك (Nitric Oxide) الذي يوسع الأوعية الدموية، يحسن تدفق الدم للعضلات (الضخ العضلي للرياضيين)، ويعزز الكفاءة الجنسية لدى الرجال.",
+                counseling: "كبسولة إلى كبسولتين يومياً قبل التمرين بـ 45 دقيقة أو بين الوجبات.",
+                dawaaSlug: ""
+            },
+            {
+                code: "508735", nameEn: "RONZAVIT L-CARNITINE 60 CAPSULE", nameAr: "رونزافيت ال-كارنتين 60 كبسولة", cat: "نشاط وطاقة", listClass: "Diamond", form: "capsules",
+                composition: "إل-كارنيتين نقي (L-Carnitine) في كبسولات (60 كبسولة).",
+                info: "ينقل الأحماض الدهنية طويلة السلسلة إلى الميتوكوندريا لحرقها وتحويلها لطاقة، مما يدعم التخسيس، الأداء الرياضي، وصحة القلب والخصوبة.",
+                counseling: "كبسولة إلى كبسولتين يومياً قبل النشاط البدني أو مع وجبة الإفطار.",
+                dawaaSlug: ""
+            },
+            {
+                code: "508736", nameEn: "RONZAVIT MAGNESIUM 375 MG 100 CAPSULE", nameAr: "رونزافيت ماغنسيوم 375 مجم 100 كبسولة", cat: "اعصاب وفيتامينات", listClass: "Diamond", form: "capsules",
+                composition: "ماغنيسيوم (Magnesium) بتركيز 375 مجم (يغطي 100% من الاحتياج اليومي الموصى به).",
+                info: "يدخل في أكثر من 300 تفاعل إنزيمي؛ يمنع الشد العضلي والتقلصات الليلية، يهدئ الجهاز العصبي، يساعد على النوم، ويدعم انتظام ضربات القلب وضغط الدم.",
+                counseling: "كبسولة واحدة يومياً مساءً قبل النوم لساعات استرخاء عضلي وعصبي مثالية.",
+                dawaaSlug: "ronzavit-dietary-supplement-magnesium-375-mg-100-capsules"
+            },
+            {
+                code: "508147", nameEn: "RONZAVIT MELATONIN /CALMTONIN 60CAP", nameAr: "رونزافيت ميلاتونين / كالمتونين 60 كبسولة", cat: "التوتر والنوم", listClass: "Diamond", form: "capsules",
+                composition: "ميلاتونين (Melatonin) مع خلاصات مهدئة داعمة للاستغراق في النوم (كالميتونين 60 كبسولة).",
+                info: "يعيد ضبط الساعة البيولوجية للجسم، يقلل الوقت اللازم للدخول في النوم، ويحسن جودة النوم العميق دون آثار انسحابية.",
+                counseling: "كبسولة واحدة قبل النوم بـ 30-60 دقيقة في غرفة خافتة الإضاءة.",
+                dawaaSlug: "calmtonin-food-supplement-aid-in-sleep-60-capsules"
+            },
+            {
+                code: "509497", nameEn: "RONZAVIT MULTI VITAMIN 60 CAPSULE", nameAr: "رونزافيت فيتامينات متعددة 60 كبسولة", cat: "فيتامينات ومناعة", listClass: "GOLD", form: "capsules",
+                composition: "22 عنصراً: كالسيوم (162 مجم)، مغنيسيوم (100 مجم)، بوتاسيوم (80 مجم)، فيتامين C (80 مجم)، حديد (14 مجم)، زنك (10 مجم)، سيلينيوم، بيوتين، وفيتامينات A, D3, E, K2, B-Complex.",
+                info: "ملتي فيتامين ومعادن شامل ومتوازن بوجود فيتامين K2-MK7 النادر؛ يغطي كافة احتياجات الجسم اليومية للمناعة، النشاط، والعظام.",
+                counseling: "كبسولة واحدة يومياً بعد وجبة الإفطار أو الغداء.",
+                dawaaSlug: "ronzavit-multi-vitamins-multi-minerals-60-capsules"
+            },
+            {
+                code: "508721", nameEn: "RONZAVIT OMEGA 3 1000MG 30 CAPSULE", nameAr: "رونزافيت أوميجا 3 30 كبسولة", cat: "أوميجا وصحة القلب", listClass: "GOLD", form: "capsules",
+                composition: "زيت سمك بحري نقي 1000 مجم غني بالأحماض الدهنية أوميجا-3 (EPA & DHA) — 30 كبسولة.",
+                info: "يدعم صحة القلب والشرايين، يخفض الدهون الثلاثية، ويحافظ على صحة الدماغ والمفاصل.",
+                counseling: "كبسولة إلى كبسولتين يومياً وسط الوجبات.",
+                dawaaSlug: "ronzavit-dietary-supplement-omega-3-1000-mg-30-capsules"
+            },
+            {
+                code: "508734", nameEn: "RONZAVIT OMEGA 3 1000MG 60 CAPSULE", nameAr: "رونزافيت أوميجا 3 60 كبسولة", cat: "أوميجا وصحة القلب", listClass: "Diamond", form: "capsules",
+                composition: "زيت سمك بحري نقي 1000 مجم غني بالأحماض الدهنية أوميجا-3 (EPA & DHA) — 60 كبسولة.",
+                info: "يحمي الأوعية الدموية، يحسن الذاكرة والتركيز، ويقلل من جفاف العين والالتهابات المفصلية.",
+                counseling: "كبسولة إلى كبسولتين يومياً وسط الوجبة الرئيسية.",
+                dawaaSlug: "ronzavit-dietary-supplement-omega-3-1000-mg-60-capsules"
+            },
+            {
+                code: "509494", nameEn: "RONZAVIT OMEGA 3, 6, 9 30 CAPSULE", nameAr: "رونزافيت أوميجا 9,6,3 30 كبسولة", cat: "أوميجا وصحة القلب", listClass: "Diamond", form: "capsules",
+                composition: "مزيج متوازن من زيت السمك (Omega-3) + زيت بذور الكتان وزيت لسان الثور/زهرة الربيع (Omega-6 & Omega-9).",
+                info: "يجمع فوائد الأوميجا الثلاثة لدعم صحة القلب، ترطيب البشرة الجافة والإكزيما، التوازن الهرموني، وصحة المفاصل.",
+                counseling: "كبسولة واحدة إلى كبسولتين يومياً مع الطعام.",
+                dawaaSlug: ""
+            },
+            {
+                code: "508728", nameEn: "RONZAVIT OMEGA-7 1000 MG 30 CAPSULE", nameAr: "رونزافيت أوميجا 7 30 كبسولة", cat: "أوميجا وصحة القلب", listClass: "Diamond", form: "capsules",
+                composition: "زيت نبق البحر النقي (Sea Buckthorn Oil) 1000 مجم الغني بحمض البالميتوليك (Omega-7).",
+                info: "يتميز أوميجا-7 بقدرته الفائقة على ترطيب وتجديد الأغشية المخاطية المبطنة للجسم (جفاف العين، الفم، والجهاز الهضمي)، بالإضافة لتحسين حساسية الإنسولين والكوليسترول.",
+                counseling: "كبسولة واحدة يومياً مع الوجبة. خيار ممتاز لمن يعانون من الجفاف المزمن في العين أو البشرة.",
+                dawaaSlug: ""
+            },
+            {
+                code: "508713", nameEn: "RONZAVIT SELENIUM 200 MCG 120 CAPSULE", nameAr: "رونزافيت سيلينيوم 200 ميكرو 120 كبسولة", cat: "فيتامينات ومناعة", listClass: "Diamond", form: "capsules",
+                composition: "سيلينيوم نقي عالي الامتصاص (Selenium) بتركيز 200 ميكروجرام (120 كبسولة).",
+                info: "معدن أساسي لتنشيط هرمونات الغدة الدرقية (تحويل T4 إلى T3 النشط)، مضاد أكسدة قوي يحمي الخلايا، ويعزز المناعة وخصوبة الرجال.",
+                counseling: "كبسولة واحدة يومياً بعد الأكل. أساسي جداً كدعم تكميلي لمرضى خمول الغدة الدرقية والهاشيموتو.",
+                dawaaSlug: "ronzavit-dietary-supplement-selenium-200-microgram-120-capsules"
+            },
+            {
+                code: "508718", nameEn: "RONZAVIT VITAMIN B COMPLEX 100 CAPSULE", nameAr: "رونزافيت فيتامين ب 100 كبسولة", cat: "اعصاب وفيتامينات", listClass: "Diamond", form: "capsules",
+                composition: "فيتامين B2 (20 مجم) + فيتامين B3 (20 مجم) + فيتامين B6 (20 مجم) + فيتامين B12 (500 ميكروجرام).",
+                info: "يقوي الأعصاب الطرفية، يعالج التنميل والوخز خاصة لمرضى السكري، ويدعم إنتاج الطاقة وتكوين كرات الدم الحمراء.",
+                counseling: "كبسولة واحدة يومياً بعد الإفطار أو الغداء. قد يلون البول باللون الأصفر الفاقع بفضل فيتامين B2 وهذا أمر طبيعي تماماً.",
+                dawaaSlug: "ronzavit-dietary-supplement-vitamin-b-complex-100-capsules"
+            },
+            {
+                code: "508731", nameEn: "RONZAVIT VITAMIN D 1000 IU 120 CAPSULE", nameAr: "رونزافيت فيتامين د 1000 وحدة 120 كبسولة", cat: "عظام ومفاصل", listClass: "Diamond", form: "capsules",
+                composition: "فيتامين د3 (Cholecalciferol 1000 IU) لكل كبسولة (عبوة 120 كبسولة).",
+                info: "الجرعة الوقائية اليومية المثالية للحفاظ على مستوى فيتامين د في الدم، تثبيت الكالسيوم في العظام، دعم المناعة، وتحسين المزاج.",
+                counseling: "كبسولة واحدة يومياً بعد الوجبة الرئيسية المحتوية على دهون لضمان الامتصاص الكامل.",
+                dawaaSlug: "ronzavit-dietary-supplement-vitamin-d-1000-iu-120-capsules"
+            },
+            {
+                code: "508714", nameEn: "RONZAVIT ZINC 25 MG 120 CAPSULE", nameAr: "رونزافيت زنك 25 مجم 120 كبسولة", cat: "فيتامينات ومناعة", listClass: "Diamond", form: "capsules",
+                composition: "زنك (Zinc) بتركيز 25 مجم لكل كبسولة (عبوة 120 كبسولة).",
+                info: "يرفع كفاءة الجهاز المناعي، يسرع التئام الجروح وعلاج حب الشباب، يقلل تساقط الشعر، ويدعم هرمون التستوستيرون والخصوبة.",
+                counseling: "كبسولة واحدة يومياً بعد وجبة الغداء مباشرة (تجنب أخذه على معدة فارغة لمنع الغثيان)، ويفصل عن الكالسيوم والحديد والمضادات الحيوية بساعتين.",
+                dawaaSlug: "ronzavit-dietary-supplement-zinc-25-mg-120-capsules"
+            },
+            {
+                code: "508623", nameEn: "SPASMIONA ORAL DROPS", nameAr: "سبازميونا نقط للفم", cat: "الجهاز الهضمي", listClass: "Diamond", form: "drops",
+                composition: "زيوت عشبية طبيعية طاردة للغازات ومهدئة للمغص (زيت الكراوية، الشمر، والنعناع/البابونج).",
+                info: "نقط فموية سريعة المفعول لطرد الغازات والانتفاخات وتهدئة المغص المعوي وتقلصات البطن لدى الرضع والأطفال.",
+                counseling: "تُعطى النقط حسب عمر الطفل قبل الرضاعة أو الوجبة. خالية من المواد الكيميائية المهدئة.",
+                dawaaSlug: ""
+            },
+            {
+                code: "507804", nameEn: "SPASMIONA 30 CAPSULE", nameAr: "سبازميونا 30 كبسولة للهضم", cat: "الجهاز الهضمي", listClass: "Diamond", form: "capsules",
+                composition: "كبسولات جيلاتينية رخوة تحتوي على زيوت الأعشاب العطرية الطاردة للغازات والمضادة للتقلصات (Carminative Essential Oils).",
+                info: "يريح القولون العصبي (IBS)، يزيل تطبل وانتفاخ البطن والغازات المحرجة، ويحسن عملية الهضم بعد الوجبات الدسمة.",
+                counseling: "كبسولة 2 إلى 3 مرات يومياً قبل أو بعد الأكل مع كوب ماء. تبلع الكبسولة كاملة ولا تمضغ.",
+                dawaaSlug: "spasmiona-softgels-carminative-and-gas-repellent-30-caps"
+            },
+            {
+                code: "509049", nameEn: "SUPER AKTIV 1000MG 30 CAP", nameAr: "سوبر أكتيف 1000 مجم 30 كبسولة", cat: "نشاط وطاقة", listClass: "Diamond", form: "capsules",
+                composition: "غذاء ملكات النحل (Royal Jelly) 1000 مجم + خلاصة الجينسينج (Ginseng) 625 مجم — 30 كبسولة.",
+                info: "منشط بدني وذهني قوي يحارب الإرهاق المزمن، يرفع القدرة على التحمل والتركيز، ويعزز المناعة والحيوية للرجال والنساء.",
+                counseling: "كبسولة واحدة يومياً بعد وجبة الإفطار. تجنب تناوله مساءً حتى لا يسبب الأرق.",
+                dawaaSlug: ""
+            },
+            {
+                code: "509050", nameEn: "SUPER AKTIV 1000MG 60 CAP", nameAr: "سوبر أكتيف 1000 مجم 60 كبسولة", cat: "نشاط وطاقة", listClass: "Diamond", form: "capsules",
+                composition: "غذاء ملكات النحل (Royal Jelly) 1000 مجم + خلاصة الجينسينج (Ginseng) 625 مجم — عبوة التوفير 60 كبسولة.",
+                info: "يجدد طاقة الجسم ونشاطه اليومي بفضل المزج بين غذاء الملكات عالي التركيز والجينسينج الكوري المنشط للدورة الدموية.",
+                counseling: "كبسولة واحدة يومياً صباحاً بعد الإفطار. يُنصح بالحذر لمرضى الضغط المرتفع غير المنتظم أو حساسية منتجات النحل.",
+                dawaaSlug: "super-aktiv-dietary-supplement-1000-mg-60-capsules"
+            },
+            {
+                code: "508487", nameEn: "THIOZAC 300 MG 30 CAPSULE", nameAr: "ثيوزاك 300 مجم 30 كبسولة", cat: "اعصاب وفيتامينات", listClass: "Diamond", form: "capsules",
+                composition: "حمض الثيوكتيك / ألفا ليبويك أسيد (Alpha-Lipoic Acid / Thioctic Acid) بتركيز 300 مجم.",
+                info: "مضاد أكسدة عصبي قوي يعمل في الوسطين المائي والدهني؛ يحمي الخلايا العصبية ويعالج اعتلال الأعصاب الطرفية السكري (تنميل وحرقان القدمين واليدين).",
+                counseling: "كبسولة إلى كبسولتين يومياً على معدة فارغة (قبل الإفطار بـ 30 دقيقة) لأن الطعام والمعادن يقللان من امتصاص مادة Alpha-Lipoic Acid.",
+                dawaaSlug: ""
+            },
+            {
+                code: "508488", nameEn: "THIOZAC 600 MG 30 CAPSULE", nameAr: "ثيوزاك 600 مجم 30 كبسولة", cat: "اعصاب وفيتامينات", listClass: "Diamond", form: "capsules",
+                composition: "حمض الثيوكتيك / ألفا ليبويك أسيد (Alpha-Lipoic Acid) بتركيز علاجي كامل 600 مجم.",
+                info: "الجرعة القياسية المعتمدة عالمياً (600 مجم يومياً) لعلاج التهاب الأعصاب الطرفية لمرضى السكري، عرق النسا، ودعم حساسية الإنسولين.",
+                counseling: "كبسولة واحدة يومياً صباحاً قبل الإفطار بنصف ساعة. ممتاز جداً عند دمجه مع رونزافيت فيتامين ب المركب.",
+                dawaaSlug: ""
+            },
+            {
+                code: "508063", nameEn: "URICRAN PLUS 30 CAPSULE", nameAr: "يوريكران بلس 30 كبسولة", cat: "مسالك بولية", listClass: "Diamond", form: "capsules",
+                composition: "خلاصة التوت البري المركزة (Cranberry Extract) الغنية بمركبات (PACs) + فيتامين C ومطهرات طبيعية لمجرى البول.",
+                info: "يمنع التصاق بكتيريا (E. coli) بجدار المثانة والمسالك البولية، مما يطهر مجرى البول ويمنع تكرار التهابات المسالك البولية (UTI).",
+                counseling: "كبسولة مرتين يومياً مع شرب كميات وفيرة من الماء. آمن وفعال جداً للسيدات المعرضات لالتهابات البول المتكررة.",
+                dawaaSlug: "urican-plus-cranberry-urethral-disinfectant-30-soft-gels"
+            },
+            {
+                code: "509506", nameEn: "URICRAN UTI 60 CAPSULE", nameAr: "يوريكران 60 كبسولة", cat: "مسالك بولية", listClass: "Diamond", form: "capsules",
+                composition: "مستخلص التوت البري عالي التركيز (Cranberry) لدعم وصحة المسالك البولية (عبوة 60 كبسولة).",
+                info: "يوفر حماية مستمرة للمثانة ومجرى البول ضد العدوى البكتيرية ويقلل من حرقان البول والرغبة الملحة في التبول.",
+                counseling: "كبسولة إلى كبسولتين يومياً مع شرب كوب كبير من الماء.",
+                dawaaSlug: ""
+            },
+            {
+                code: "508732", nameEn: "VITA-RONZ VITAMIN D 1000 IU 10 ML BOTTLE", nameAr: "فيتا-رونز فيتامين د 1000 وحدة 10 مل", cat: "عظام ومفاصل", listClass: "Diamond", form: "drops",
+                composition: "نقط فموية مركزة تحتوي على فيتامين د3 (Cholecalciferol 1000 IU) في عبوة 10 مل مزودة بقطارة دقيقة.",
+                info: "نقط سريعة الامتصاص لدعم نمو العظام والأسنان والمناعة لدى الرضع والأطفال والبالغين الذين يفضلون النقط السائلة.",
+                counseling: "تؤخذ الجرعة المحددة بالقطارة مباشرة في الفم أو تخلط مع الحليب أو العصير مرة واحدة يومياً.",
+                dawaaSlug: ""
+            }
+        ].sort((a, b) => a.nameEn.localeCompare(b.nameEn));
+
+        const categoryThemes = {
+            "أوميجا وصحة القلب": { grad: "from-amber-500 to-orange-600", light: "bg-amber-50 text-amber-800 border-amber-200", icon: "fa-heart-pulse", hex1: "#f59e0b", hex2: "#ea580c" },
+            "أطفال وفواتح شهية": { grad: "from-pink-500 to-rose-500", light: "bg-pink-50 text-pink-800 border-pink-200", icon: "fa-child-reaching", hex1: "#ec4899", hex2: "#f43f5e" },
+            "اعصاب وفيتامينات": { grad: "from-indigo-600 to-violet-700", light: "bg-indigo-50 text-indigo-800 border-indigo-200", icon: "fa-bolt-lightning", hex1: "#4f46e5", hex2: "#6d28d9" },
+            "التوتر والنوم": { grad: "from-purple-600 to-indigo-800", light: "bg-purple-50 text-purple-800 border-purple-200", icon: "fa-moon", hex1: "#9333ea", hex2: "#3730a3" },
+            "الجهاز الهضمي": { grad: "from-emerald-500 to-teal-600", light: "bg-emerald-50 text-emerald-800 border-emerald-200", icon: "fa-stethoscope", hex1: "#10b981", hex2: "#0d9488" },
+            "أنف وأذن وحنجرة": { grad: "from-sky-500 to-cyan-600", light: "bg-sky-50 text-sky-800 border-sky-200", icon: "fa-spray-can-sparkles", hex1: "#0ea5e9", hex2: "#0891b2" },
+            "تخسيس ورشاقة": { grad: "from-lime-500 to-green-600", light: "bg-lime-50 text-lime-800 border-lime-200", icon: "fa-weight-scale", hex1: "#84cc16", hex2: "#16a34a" },
+            "ذاكرة وتركيز": { grad: "from-blue-600 to-indigo-700", light: "bg-blue-50 text-blue-800 border-blue-200", icon: "fa-brain", hex1: "#2563eb", hex2: "#4338ca" },
+            "جهاز تنفسي وسعال": { grad: "from-teal-500 to-cyan-700", light: "bg-teal-50 text-teal-800 border-teal-200", icon: "fa-lungs", hex1: "#14b8a6", hex2: "#0e7490" },
+            "جلدية وجروح": { grad: "from-rose-400 to-pink-600", light: "bg-rose-50 text-rose-800 border-rose-200", icon: "fa-hand-holding-medical", hex1: "#fb7185", hex2: "#db2777" },
+            "شعر وأظافر": { grad: "from-fuchsia-500 to-pink-600", light: "bg-fuchsia-50 text-fuchsia-800 border-fuchsia-200", icon: "fa-wand-magic-sparkles", hex1: "#d946ef", hex2: "#db2777" },
+            "صحة الرجل والبروستاتا": { grad: "from-slate-700 to-blue-900", light: "bg-slate-100 text-slate-800 border-slate-300", icon: "fa-user-shield", hex1: "#334155", hex2: "#1e3a8a" },
+            "صحة المرأة والحوامل": { grad: "from-pink-400 to-purple-600", light: "bg-pink-50 text-pink-800 border-pink-200", icon: "fa-venus", hex1: "#f472b6", hex2: "#9333ea" },
+            "عظام ومفاصل": { grad: "from-cyan-600 to-blue-700", light: "bg-cyan-50 text-cyan-800 border-cyan-200", icon: "fa-bone", hex1: "#0891b2", hex2: "#1d4ed8" },
+            "فيتامينات ومناعة": { grad: "from-orange-500 to-amber-600", light: "bg-orange-50 text-orange-800 border-orange-200", icon: "fa-shield-virus", hex1: "#f97316", hex2: "#d97706" },
+            "مضادات أكسدة (Anti Oxidants)": { grad: "from-violet-500 to-purple-700", light: "bg-violet-50 text-violet-800 border-violet-200", icon: "fa-atom", hex1: "#8b5cf6", hex2: "#7e22ce" },
+            "مكملات عشبية": { grad: "from-green-600 to-emerald-800", light: "bg-green-50 text-green-800 border-green-200", icon: "fa-leaf", hex1: "#16a34a", hex2: "#065f46" },
+            "مسالك بولية": { grad: "from-red-500 to-rose-700", light: "bg-red-50 text-red-800 border-red-200", icon: "fa-droplet", hex1: "#ef4444", hex2: "#be123c" },
+            "حلاو جيلاتيني (Gummies)": { grad: "from-rose-500 to-orange-500", light: "bg-rose-50 text-rose-800 border-rose-200", icon: "fa-candy-cane", hex1: "#f43f5e", hex2: "#f97316" },
+            "نشاط وطاقة": { grad: "from-red-600 to-amber-600", light: "bg-red-50 text-red-800 border-red-200", icon: "fa-fire-flame-curved", hex1: "#dc2626", hex2: "#d97706" }
+        };
+
+        function generateProductPackageSVG(item) {
+            const theme = categoryThemes[item.cat] || { hex1: "#0f766e", hex2: "#14b8a6" };
+            const words = item.nameEn.split(' ');
+            const shortEn = words.slice(0, 2).join(' ');
+            const subEn = words.slice(2, 5).join(' ');
+
+            const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 180" width="200" height="165">
+                <circle cx="110" cy="90" r="75" fill="${theme.hex1}" opacity="0.08"/>
+                <rect x="35" y="22" width="105" height="136" rx="10" fill="#ffffff" stroke="#cbd5e1" stroke-width="2"/>
+                <rect x="35" y="22" width="105" height="28" rx="10" fill="${theme.hex1}"/>
+                <text x="87" y="40" font-family="sans-serif" font-size="11" font-weight="bold" fill="#ffffff" text-anchor="middle">RONZAC</text>
+                <text x="87" y="74" font-family="sans-serif" font-size="10.5" font-weight="bold" fill="#1e293b" text-anchor="middle">${shortEn}</text>
+                <text x="87" y="92" font-family="sans-serif" font-size="8.5" font-weight="bold" fill="${theme.hex2}" text-anchor="middle">${subEn}</text>
+                <rect x="52" y="115" width="70" height="22" rx="11" fill="${theme.hex1}" opacity="0.12"/>
+                <text x="87" y="130" font-family="monospace" font-size="9" font-weight="bold" fill="${theme.hex1}" text-anchor="middle">#${item.code}</text>
+                <rect x="136" y="52" width="42" height="15" rx="4" fill="${theme.hex2}"/>
+                <rect x="130" y="67" width="54" height="92" rx="12" fill="#f8fafc" stroke="#94a3b8" stroke-width="2"/>
+                <rect x="132" y="88" width="50" height="46" fill="${theme.hex1}" opacity="0.15"/>
+                <circle cx="157" cy="111" r="11" fill="${theme.hex1}"/>
+                <text x="157" y="115" font-family="sans-serif" font-size="8" font-weight="bold" fill="#ffffff" text-anchor="middle">Rx</text>
+            </svg>`;
+            return "data:image/svg+xml;utf8," + encodeURIComponent(svg);
+        }
+
+        const categoriesList = [
+            "الكل",
+            ...Array.from(new Set(rawProductsData.map(p => p.cat))).sort((a, b) => a.localeCompare(b, 'ar'))
+        ];
+
+        let selectedCategory = "الكل";
+        let currentSearchQuery = "";
+        let selectedClassFilter = "ALL";
+        let allFlipped = false;
+        let currentModalCode = null;
+        let customImages = {};
+
+        try {
+            customImages = JSON.parse(localStorage.getItem('ronzac_custom_images') || '{}');
+        } catch (e) {
+            customImages = {};
+        }
+
+        const cardsGrid = document.getElementById('cards-grid');
+        const searchInput = document.getElementById('search-input');
+        const classFilter = document.getElementById('class-filter');
+        const categoryChipsContainer = document.getElementById('category-chips');
+        const resetBtn = document.getElementById('reset-btn');
+        const emptyState = document.getElementById('empty-state');
+        const filterStatusBar = document.getElementById('filter-status-bar');
+        const activeFilterText = document.getElementById('active-filter-text');
+        const resultsCount = document.getElementById('results-count');
+        const flipAllBtn = document.getElementById('flip-all-btn');
+        const flipAllText = document.getElementById('flip-all-text');
+
+        function initApp() {
+            document.getElementById('total-count').innerText = rawProductsData.length;
+            document.getElementById('diamond-count').innerText = rawProductsData.filter(p => p.listClass.toUpperCase() === 'DIAMOND').length;
+            document.getElementById('gold-count').innerText = rawProductsData.filter(p => p.listClass.toUpperCase() === 'GOLD').length;
+
+            renderCategoryChips();
+            renderFlashcards();
+
+            searchInput.addEventListener('input', (e) => {
+                currentSearchQuery = e.target.value.trim().toLowerCase();
+                renderFlashcards();
+            });
+
+            classFilter.addEventListener('change', (e) => {
+                selectedClassFilter = e.target.value;
+                renderFlashcards();
+            });
+
+            resetBtn.addEventListener('click', () => {
+                selectedCategory = "الكل";
+                currentSearchQuery = "";
+                selectedClassFilter = "ALL";
+                searchInput.value = "";
+                classFilter.value = "ALL";
+                renderCategoryChips();
+                renderFlashcards();
+            });
+
+            flipAllBtn.addEventListener('click', () => {
+                allFlipped = !allFlipped;
+                document.querySelectorAll('.flip-card').forEach(card => {
+                    card.classList.toggle('flipped', allFlipped);
+                });
+                flipAllText.innerText = allFlipped ? 'إرجاع البطاقات للواجهة' : 'قلب كل البطاقات';
+            });
+
+            document.getElementById('close-modal-btn').addEventListener('click', closeImgModal);
+            document.getElementById('save-img-btn').addEventListener('click', saveCustomImage);
+            document.getElementById('reset-img-btn').addEventListener('click', resetCustomImage);
+        }
+
+        function renderCategoryChips() {
+            categoryChipsContainer.innerHTML = '';
+            categoriesList.forEach(cat => {
+                const count = cat === "الكل" ? rawProductsData.length : rawProductsData.filter(p => p.cat === cat).length;
+                const btn = document.createElement('button');
+                btn.className = `px-3 py-1.5 rounded-xl text-xs font-bold transition-all border flex items-center gap-1.5 cursor-pointer ${
+                    selectedCategory === cat 
+                    ? 'bg-emerald-600 text-white border-emerald-600 shadow-md' 
+                    : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200'
+                }`;
+                btn.innerHTML = `<span>${cat}</span><span class="text-[10px] px-1.5 py-0.2 rounded-full ${selectedCategory === cat ? 'bg-emerald-800 text-emerald-100' : 'bg-slate-200 text-slate-600'}">${count}</span>`;
+                btn.addEventListener('click', () => {
+                    selectedCategory = cat;
+                    renderCategoryChips();
+                    renderFlashcards();
+                });
+                categoryChipsContainer.appendChild(btn);
+            });
+        }
+
+        function renderFlashcards() {
+            const filtered = rawProductsData.filter(item => {
+                const matchesSearch = 
+                    item.code.toLowerCase().includes(currentSearchQuery) ||
+                    item.nameEn.toLowerCase().includes(currentSearchQuery) ||
+                    item.nameAr.toLowerCase().includes(currentSearchQuery) ||
+                    item.composition.toLowerCase().includes(currentSearchQuery) ||
+                    item.info.toLowerCase().includes(currentSearchQuery);
+
+                const matchesCategory = (selectedCategory === "الكل") || (item.cat === selectedCategory);
+                const matchesClass = (selectedClassFilter === "ALL") || (item.listClass.toUpperCase() === selectedClassFilter.toUpperCase());
+
+                return matchesSearch && matchesCategory && matchesClass;
+            });
+
+            const isFiltered = selectedCategory !== "الكل" || currentSearchQuery !== "" || selectedClassFilter !== "ALL";
+            filterStatusBar.classList.toggle('hidden', !isFiltered);
+            
+            let statusText = [];
+            if (selectedCategory !== "الكل") statusText.push(`القسم: ${selectedCategory}`);
+            if (selectedClassFilter !== "ALL") statusText.push(`الفئة: ${selectedClassFilter}`);
+            if (currentSearchQuery !== "") statusText.push(`البحث: "${currentSearchQuery}"`);
+            
+            activeFilterText.innerText = statusText.join(' | ');
+            resultsCount.innerText = `${filtered.length} بطاقة`;
+
+            cardsGrid.innerHTML = '';
+
+            if (filtered.length === 0) {
+                emptyState.classList.remove('hidden');
+                return;
+            } else {
+                emptyState.classList.add('hidden');
+            }
+
+            filtered.forEach(item => {
+                const isDiamond = item.listClass.toUpperCase() === 'DIAMOND';
+                const theme = categoryThemes[item.cat] || { grad: "from-emerald-600 to-teal-700", light: "bg-emerald-50 text-emerald-800 border-emerald-200", icon: "fa-capsules" };
+                const defaultSvg = generateProductPackageSVG(item);
+                const imgSrc = customImages[item.code] || defaultSvg;
+                const dawaaUrl = item.dawaaSlug 
+                    ? `https://www.al-dawaa.com/ar/p/${item.code}/${item.dawaaSlug}`
+                    : `https://www.al-dawaa.com/ar/catalogsearch/result/?q=${item.code}`;
+
+                const classBadge = isDiamond ? 
+                    `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-sky-100 text-sky-800 border border-sky-300 gap-1">💎 Diamond</span>` :
+                    `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-800 border border-amber-300 gap-1">⭐ GOLD</span>`;
+
+                const card = document.createElement('div');
+                card.className = `flip-card perspective-1000 ${allFlipped ? 'flipped' : ''}`;
+                
+                card.innerHTML = `
+                    <div class="flip-card-inner shadow-md hover:shadow-xl rounded-2xl">
+                        <!-- FRONT -->
+                        <div class="flip-card-front border border-slate-200">
+                            <div class="h-2 bg-gradient-to-r ${theme.grad}"></div>
+                            
+                            <div class="px-4 pt-3 flex items-center justify-between gap-2">
+                                <span class="font-mono text-xs font-black bg-slate-800 text-emerald-400 px-2.5 py-1 rounded-lg">
+                                    SKU: ${item.code}
+                                </span>
+                                <div class="flex items-center gap-1.5">
+                                    ${classBadge}
+                                    <button type="button" class="cam-btn w-7 h-7 rounded-lg bg-slate-100 hover:bg-emerald-100 text-slate-600 flex items-center justify-center cursor-pointer" title="تغيير صورة المنتج">
+                                        📷
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="flex-grow flex items-center justify-center px-4 py-1 overflow-hidden">
+                                <img src="${imgSrc}" alt="${item.nameAr}" class="max-h-40 w-auto object-contain">
+                            </div>
+
+                            <div class="px-4 pb-4 pt-2 bg-slate-50 border-t border-slate-100 text-center">
+                                <span class="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-0.5 rounded-md border mb-1.5 ${theme.light}">
+                                    <span>${item.cat}</span>
+                                </span>
+                                <h3 class="text-base font-black text-slate-800 leading-snug truncate">${item.nameAr}</h3>
+                                <p class="text-xs font-bold text-slate-500 mt-0.5 truncate" dir="ltr">${item.nameEn}</p>
+                                
+                                <div class="mt-2.5 pt-2 border-t border-slate-200 flex items-center justify-between text-[11px] text-emerald-700 font-bold">
+                                    <span>🔄 اضغط لعرض التركيبة والـ Counseling</span>
+                                    <a href="${dawaaUrl}" target="_blank" class="dawaa-link text-sky-600 hover:underline">الدواء ↗</a>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- BACK -->
+                        <div class="flip-card-back border-2 border-emerald-600">
+                            <div class="bg-slate-900 text-white px-4 py-2.5 flex items-center justify-between">
+                                <div class="truncate pl-2">
+                                    <h4 class="text-sm font-black text-emerald-300 truncate">${item.nameAr}</h4>
+                                    <p class="text-[10px] text-slate-300 font-mono" dir="ltr">SKU: ${item.code} | ${item.nameEn}</p>
+                                </div>
+                                <span class="bg-white/10 text-white px-2 py-1 rounded text-xs">↩</span>
+                            </div>
+
+                            <div class="p-3.5 overflow-y-auto custom-scroll flex-grow space-y-2.5 text-right">
+                                <div class="bg-emerald-50 border-r-4 border-emerald-600 rounded-lg p-2.5">
+                                    <span class="text-[11px] font-black text-emerald-900 block mb-1">🧪 التركيبة العلمية (Composition):</span>
+                                    <p class="text-xs text-slate-700 font-semibold leading-relaxed">${item.composition}</p>
+                                </div>
+
+                                <div class="bg-sky-50 border-r-4 border-sky-500 rounded-lg p-2.5">
+                                    <span class="text-[11px] font-black text-sky-900 block mb-1">ℹ️ المعلومة الطبية والاستخدام:</span>
+                                    <p class="text-xs text-slate-700 font-medium leading-relaxed">${item.info}</p>
+                                </div>
+
+                                <div class="bg-amber-50 border-r-4 border-amber-500 rounded-lg p-2.5">
+                                    <span class="text-[11px] font-black text-amber-900 block mb-1">💡 نصائح الصيدلي (Counseling Tips):</span>
+                                    <p class="text-xs text-slate-800 font-bold leading-relaxed">${item.counseling}</p>
+                                </div>
+                            </div>
+
+                            <div class="px-4 py-2 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-[11px]">
+                                <span class="font-bold text-slate-500">${item.cat}</span>
+                                <a href="${dawaaUrl}" target="_blank" class="dawaa-link font-bold text-emerald-700 hover:underline">عرض في تطبيق الدواء ↗</a>
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                card.querySelector('.cam-btn').addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    openImgModal(item.code, item.nameAr);
+                });
+
+                card.querySelectorAll('.dawaa-link').forEach(link => {
+                    link.addEventListener('click', (e) => e.stopPropagation());
+                });
+
+                card.addEventListener('click', () => {
+                    card.classList.toggle('flipped');
+                });
+
+                cardsGrid.appendChild(card);
+            });
+        }
+
+        function openImgModal(code, nameAr) {
+            currentModalCode = code;
+            document.getElementById('modal-product-name').innerText = `${nameAr} (SKU: ${code})`;
+            document.getElementById('custom-img-url').value = customImages[code] && !customImages[code].startsWith('data:') ? customImages[code] : '';
+            document.getElementById('custom-img-file').value = '';
+            document.getElementById('img-modal').classList.remove('hidden');
+        }
+
+        function closeImgModal() {
+            document.getElementById('img-modal').classList.add('hidden');
+            currentModalCode = null;
+        }
+
+        function saveCustomImage() {
+            if (!currentModalCode) return;
+            const urlInput = document.getElementById('custom-img-url').value.trim();
+            const fileInput = document.getElementById('custom-img-file').files[0];
+
+            if (fileInput) {
+                const reader = new FileReader();
+                reader.onload = function(evt) {
+                    customImages[currentModalCode] = evt.target.result;
+                    try { localStorage.setItem('ronzac_custom_images', JSON.stringify(customImages)); } catch(e){}
+                    closeImgModal();
+                    renderFlashcards();
+                };
+                reader.readAsDataURL(fileInput);
+            } else if (urlInput) {
+                customImages[currentModalCode] = urlInput;
+                try { localStorage.setItem('ronzac_custom_images', JSON.stringify(customImages)); } catch(e){}
+                closeImgModal();
+                renderFlashcards();
+            } else {
+                closeImgModal();
+            }
+        }
+
+        function resetCustomImage() {
+            if (!currentModalCode) return;
+            delete customImages[currentModalCode];
+            try { localStorage.setItem('ronzac_custom_images', JSON.stringify(customImages)); } catch(e){}
+            closeImgModal();
+            renderFlashcards();
+        }
+
+        document.addEventListener('DOMContentLoaded', initApp);
+    </script>
+</body>
+</html>
